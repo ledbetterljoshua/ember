@@ -88,3 +88,24 @@ start:
 fwd:    b       start
         bl      fwd
         svc     #0
+        lsl     x0, x1, #3
+        lsl     w0, w1, #31
+        lsr     x0, x1, #63
+        lsr     w0, w1, #1
+        asr     x0, x1, #2
+        asr     w0, w1, #31
+        ubfx    x0, x1, #4, #8
+        sbfx    w0, w1, #3, #5
+        ubfiz   x0, x1, #5, #10
+        sbfiz   x0, x1, #2, #30
+        uxtb    w0, w1
+        uxth    w0, w1
+        sxtb    x0, w1
+        sxth    w0, w1
+        sxtw    x0, w1
+        bfi     x0, x1, #8, #4
+        bfxil   w0, w1, #2, #3
+        bfc     x0, #4, #2
+        ror     x0, x1, #7
+        extr    x0, x1, x2, #12
+        ubfx    x0, x1, #0, #8

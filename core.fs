@@ -107,6 +107,12 @@
 : CONSTANT ( n -- ) WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
 : VARIABLE HERE @ 1 CELLS ALLOT WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
 
+( Defining words that define words. <BUILDS makes a word that pushes the
+  address of its data; DOES> gives every word built that way a behavior.
+    : CONST <BUILDS , DOES> @ ;   7 CONST SEVEN   SEVEN .  \ 7 )
+: <BUILDS ( "name" -- ) WORD CREATE DODOES , 0 , ;
+: DOES> IMMEDIATE ' (DOES>) , ;
+
 ( Introspection: walk the dictionary. )
 : ID. ( header -- ) 8+ DUP 1+ SWAP C@ F_LENMASK AND TELL ;
 : HIDDEN? ( header -- f ) 8+ C@ F_HIDDEN AND ;
@@ -130,6 +136,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         CFA> ID. ."  ( " 8+ DUP @ DUP . ." ) "
         OVER + FAR @ MAX FAR ! 8+ EXIT THEN
     DUP ' ' = IF DROP ." ' " 8+ DUP @ CFA> ID. SPACE 8+ EXIT THEN
+    DUP ' (DOES>) = IF DROP ." DOES> " 8+ EXIT THEN
     CFA> ?DUP IF ID. ELSE ." ?" THEN SPACE 8+ ;
 : SEE-CODE ( header -- )
     ." ( " DUP ID. ." : arm64"
@@ -137,15 +144,19 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         DUP @ 4294967295 AND DUP SPACE .HEX
         3592355872 = IF LEAVE THEN 4 +
     LOOP DROP ."  )" CR ;
-: SEE ( "name" -- )
-    WORD FIND ?DUP 0= IF ." not found" CR EXIT THEN
-    DUP >CFA @ DOCOL <> IF SEE-CODE EXIT THEN
-    ':' EMIT SPACE DUP ID. SPACE
-    DUP 8+ C@ F_IMMED AND IF ." IMMEDIATE " THEN
-    >CFA 8+
+: SEE-BODY ( addr -- )
     0 FAR !
     BEGIN DUP @ ' EXIT = OVER FAR @ >= AND NOT WHILE SEE-CELL REPEAT
     DROP ';' EMIT CR ;
+: SEE-DOES ( header -- )
+    ." ( " DUP ID. ."  is a <BUILDS word ) " >CFA 8+ @ ?DUP IF ." DOES> " SEE-BODY ELSE CR THEN ;
+: SEE ( "name" -- )
+    WORD FIND ?DUP 0= IF ." not found" CR EXIT THEN
+    DUP >CFA @ DODOES = IF SEE-DOES EXIT THEN
+    DUP >CFA @ DOCOL <> IF SEE-CODE EXIT THEN
+    ':' EMIT SPACE DUP ID. SPACE
+    DUP 8+ C@ F_IMMED AND IF ." IMMEDIATE " THEN
+    >CFA 8+ SEE-BODY ;
 
 ( A census of the dictionary: kernel headers live in the binary, grown ones
   in DICT0 space above it. )

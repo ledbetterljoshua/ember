@@ -57,13 +57,17 @@
 : MIN ( a b -- min ) 2DUP > IF SWAP THEN DROP ;
 : MAX ( a b -- max ) 2DUP < IF SWAP THEN DROP ;
 : SPACES ( n -- ) BEGIN DUP 0> WHILE SPACE 1- REPEAT DROP ;
+: ARSHIFT ( n u -- n' ) OVER 0< IF SWAP INVERT SWAP RSHIFT INVERT ELSE RSHIFT THEN ;
+( Errors go to stderr, so a program writing binary to stdout stays intact. )
+: >ERR FLUSH 2 OUT ! ;
+: >OUT FLUSH 1 OUT ! ;
 : DECIMAL 10 BASE ! ;
 : HEX 16 BASE ! ;
 
 ( Counted loops: limit start DO ... LOOP. The index lives on the return stack. )
 : DO IMMEDIATE ' SWAP , ' >R , ' >R , HERE @ ;
-: LOOP IMMEDIATE ' (LOOP) , ' 0BRANCH , HERE @ - , ' UNLOOP , ;
-: +LOOP IMMEDIATE ' (+LOOP) , ' 0BRANCH , HERE @ - , ' UNLOOP , ;
+: LOOP IMMEDIATE ' (LOOP) , HERE @ - , ' UNLOOP , ;
+: +LOOP IMMEDIATE ' (+LOOP) , HERE @ - , ' UNLOOP , ;
 ( LEAVE makes the current pass the last one. )
 : LEAVE R> R> DROP R@ >R >R ;
 
@@ -112,13 +116,15 @@
 
 ( Defining words. A constant is a tiny colon definition that pushes its value. )
 : CONSTANT ( n -- ) WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
-: VARIABLE HERE @ 1 CELLS ALLOT WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
 
 ( Defining words that define words. <BUILDS makes a word that pushes the
   address of its data; DOES> gives every word built that way a behavior.
     : CONST <BUILDS , DOES> @ ;   7 CONST SEVEN   SEVEN .  \ 7 )
 : <BUILDS ( "name" -- ) WORD CREATE DODOES , 0 , ;
 : DOES> IMMEDIATE ' (DOES>) , ;
+( A variable is a <BUILDS word with one cell of data after its header, so
+  VARIABLE BUF 64 ALLOT gives BUF 72 contiguous bytes. )
+: VARIABLE <BUILDS 0 , ;
 
 ( Introspection: walk the dictionary. )
 : ID. ( header -- ) 8+ DUP 1+ SWAP C@ F_LENMASK AND TELL ;
@@ -133,13 +139,16 @@
   no Forth to recover, so it prints the machine words up to the first NEXT. )
 : .HEX ( u -- ) BASE @ SWAP HEX U. BASE ! ;
 VARIABLE FAR   ( furthest forward-branch target seen so far )
+: BRANCHY? ( xt -- f ) ( is the next cell a branch offset? )
+    DUP ' 0BRANCH = OVER ' BRANCH = OR
+    OVER ' (LOOP) = OR SWAP ' (+LOOP) = OR ;
 : SEE-CELL ( addr -- addr' )
     DUP @
     DUP ' LIT = IF DROP 8+ DUP @ DUP CFA> ?DUP
         IF ." ['] " ID. SPACE DROP ELSE . THEN 8+ EXIT THEN
     DUP ' LITSTRING = IF DROP [ CHAR S ] LITERAL EMIT '"' EMIT SPACE
         8+ DUP @ SWAP 8+ SWAP 2DUP TELL '"' EMIT SPACE + ALIGNED EXIT THEN
-    DUP ' 0BRANCH = OVER ' BRANCH = OR IF
+    DUP BRANCHY? IF
         CFA> ID. ."  ( " 8+ DUP @ DUP . ." ) "
         OVER + FAR @ MAX FAR ! 8+ EXIT THEN
     DUP ' ' = IF DROP ." ' " 8+ DUP @ CFA> ID. SPACE 8+ EXIT THEN
@@ -158,7 +167,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
 : SEE-DOES ( header -- )
     ." ( " DUP ID. ."  is a <BUILDS word ) " >CFA 8+ @ ?DUP IF ." DOES> " SEE-BODY ELSE CR THEN ;
 : SEE ( "name" -- )
-    WORD FIND ?DUP 0= IF ." not found" CR EXIT THEN
+    WORD FIND ?DUP 0= IF >ERR ." not found" CR >OUT EXIT THEN
     DUP >CFA @ DODOES = IF SEE-DOES EXIT THEN
     DUP >CFA @ DOCOL <> IF SEE-CODE EXIT THEN
     ':' EMIT SPACE DUP ID. SPACE
@@ -188,7 +197,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
     THEN ;
 ( After an error inside a definition, skip to its ";" rather than run the rest. )
 : SKIP-DEF ( -- ) BEGIN WORD 1 = SWAP C@ ';' = AND UNTIL ;
-: ?STACK ( -- ) DSP@ S0 @ > IF ." stack underflow" CR RESET THEN ;
+: ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT RESET THEN ;
 ( INTERPRET compiles or pushes what it can, and hands back a word to run so
   that QUIT runs it with nothing of INTERPRET's on the return stack. )
 : INTERPRET ( -- xt true | false )
@@ -197,7 +206,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         IF TRUE EXIT THEN , FALSE EXIT
     THEN
     2DUP NUMBER 0= IF NIP NIP STATE @ IF ' LIT , , THEN FALSE EXIT THEN
-    DROP TELL ."  ?" CR
+    >ERR DROP TELL ."  ?" CR >OUT
     STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF THEN THEN
     RESET FALSE ;
 : QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK AGAIN ;

@@ -9,10 +9,16 @@ itself in Forth.
   every loop, comments, strings, number printing, `CONSTANT`, `VARIABLE`, and
   `SEE`, a decompiler that rebuilds source from compiled threaded code (and
   prints raw ARM64 instruction words for primitives).
+- `lib/disasm.fs`, loaded after `core.fs`, is an AArch64 disassembler in
+  Forth. With it, `SEE DUP` prints assembly, with branch targets and
+  `adrp`/`add` pairs named from the binary's own symbol table, which it reads
+  out of the Mach-O image in memory. `lib/disasm-check.sh` diffs it against
+  `objdump -d`, instruction by instruction.
 - `demos/`: Mandelbrot in fixed point, Conway's Life on a torus with a Gosper
   gun that its own gliders eventually destroy, `self.fs`, where the system
-  decompiles its own decompiler, and `song.fs`, a synthesizer that reads a
-  tracker score and writes a 53-second stereo WAV to stdout.
+  decompiles its own decompiler; `song.fs`, a synthesizer that reads a
+  tracker score and writes a 53-second stereo WAV to stdout; and `fire.fs`, a
+  fire in 24-bit color that burns for a while and then goes out.
 
 ```
 make            # build
@@ -20,7 +26,9 @@ make repl       # interactive: type Forth, ctrl-D to quit
 make demo
 make test
 make song       # renders demos/song.fs to kindling.wav and plays it
+make bench      # CPU cycles per benchmark (bench/run.sh ../other . compares)
 ./ember core.fs demos/life.fs
+./ember core.fs lib/disasm.fs -    # REPL where SEE DUP reads as assembly
 ```
 
 Try in the REPL: `SEE SEE`, `SEE DUP`, `WORDS`, `BANNER`,

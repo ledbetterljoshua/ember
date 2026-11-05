@@ -261,7 +261,8 @@ _key:
 6:      LOADADDR x9, cur_fd
         str     x0, [x9]
         b       2b
-7:      LOADADDR x0, msg_noopen
+7:      bl      _to_err
+        LOADADDR x0, msg_noopen
         bl      _cstr
         LOADADDR x9, err_path
         ldr     x0, [x9]
@@ -310,13 +311,28 @@ _emit:
         str     x10, [x9]
         ret
 
+// _to_err / _to_out: switch the output stream, flushing what's buffered first
+_to_err:
+        mov     x9, #2
+        b       1f
+_to_out:
+        mov     x9, #1
+1:      ENTER
+        str     x9, [sp, #-16]!
+        bl      _flush
+        ldr     x9, [sp], #16
+        LOADADDR x10, var_OUT
+        str     x9, [x10]
+        LEAVE
+
 _flush:
         LOADADDR x9, outlen
         ldr     x2, [x9]
         cbz     x2, 2f
         str     xzr, [x9]
         LOADADDR x1, output_buffer
-1:      mov     x0, #1
+1:      LOADADDR x0, var_OUT
+        ldr     x0, [x0]
         mov     x16, #SYS_write
         stp     x1, x2, [sp, #-16]!
         svc     #0x80
@@ -669,26 +685,39 @@ _comma:
         PUSH    x0
         NEXT
 
-        defcode "(LOOP)", PLOOP         // -- done?
-        ldp     x0, x1, [x21]
+// (LOOP) and (+LOOP) are followed by a branch offset cell, like BRANCH: they
+// jump back by it until the index reaches the limit, then fall through.
+// Index and limit are read with two ldr, not one ldp: an ldp spanning the
+// index stored on the previous pass can't be forwarded from that store and
+// waits for it, which cancelled the gain from branching here.
+        defcode "(LOOP)", PLOOP         // --
+        ldr     x0, [x21]
+        ldr     x1, [x21, #8]
         add     x0, x0, #1
         str     x0, [x21]
         cmp     x0, x1
-        csetm   x2, ge
-        PUSH    x2
+        b.ge    1f
+        ldr     x2, [x19]
+        add     x19, x19, x2
+        NEXT
+1:      add     x19, x19, #8
         NEXT
 
-        defcode "(+LOOP)", PPLOOP       // step -- done?
+        defcode "(+LOOP)", PPLOOP       // step --
         POP     x3
-        ldp     x0, x1, [x21]
+        ldr     x0, [x21]
+        ldr     x1, [x21, #8]
         add     x0, x0, x3
         str     x0, [x21]
         cmp     x0, x1
-        csetm   x2, ge
-        csetm   x4, lt
-        cmp     x3, #0
-        csel    x2, x4, x2, lt
-        PUSH    x2
+        tbnz    x3, #63, 2f             // counting down: done once below limit
+        b.ge    1f
+        b       3f
+2:      b.lt    1f
+3:      ldr     x2, [x19]
+        add     x19, x19, x2
+        NEXT
+1:      add     x19, x19, #8
         NEXT
 
         defcode "UNLOOP", UNLOOP
@@ -702,6 +731,7 @@ _comma:
         defvar  "LATEST", LATEST, name_BYE
         defvar  "S0", SZ
         defvar  "BASE", BASE, 10
+        defvar  "OUT", OUT, 1           // fd that EMIT and TELL write to
 
         defaddr "R0", RZ, return_stack, RSTACK_SIZE
         defaddr "DOCOL", __DOCOL, DOCOL
@@ -938,7 +968,8 @@ _comma:
         NEXT
 4:      PUSH    x26
         NEXT
-5:      mov     x24, x26                // unknown: print "word ?"
+5:      bl      _to_err                 // unknown: "word ?" to stderr
+        mov     x24, x26
         mov     x25, x27
 6:      cbz     x25, 7f
         ldrb    w0, [x24], #1
@@ -951,6 +982,7 @@ _comma:
         bl      _emit
         mov     w0, #10
         bl      _emit
+        bl      _to_out
         NEXT
 
         defword "QUIT", QUIT

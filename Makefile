@@ -13,4 +13,7 @@ song: ember
 test: ember
 	./tests/run.sh
 
-.PHONY: repl demo song test
+bench: ember
+	./bench/run.sh
+
+.PHONY: repl demo song test bench

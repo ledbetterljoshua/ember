@@ -15,7 +15,7 @@
 
 ( ---- Fixed point ---- )
 : 2OVER ( a b c d -- a b c d a b ) 3 PICK 3 PICK ;
-: G* ( s g -- s' ) * 65536 / ;
+: G* ( s g -- s' ) 65536 */ ;
 : MSEC ( ms -- samples ) RATE * 1000 / ;
 : TAU ( ms -- k ) MSEC 1 MAX 1048576 SWAP / 1048576 SWAP - ;
 : FADE ( var k -- ) OVER @ * 1048576 / SWAP ! ;

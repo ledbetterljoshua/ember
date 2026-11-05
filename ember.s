@@ -617,6 +617,22 @@ _comma:
         ldr     x1, [x0]
         br      x1
 
+        defcode "*/", STARSLASH         // a b c -- a*b/c (64-bit product, truncating)
+        cbz     x22, 2f
+1:      ldr     x1, [x20]
+        ldr     x2, [x20, #8]
+        add     x20, x20, #16
+        mul     x1, x2, x1
+        sdiv    x22, x1, x22
+        NEXT
+2:      LOADADDR x9, var_DIVZERO        // c = 0: as /MOD does
+        ldr     x0, [x9]
+        cbz     x0, 1b
+        ldr     x22, [x20, #16]
+        add     x20, x20, #24
+        ldr     x1, [x0]
+        br      x1
+
         defcode "NEGATE", NEGATE
         neg     x22, x22
         NEXT

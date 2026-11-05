@@ -851,8 +851,11 @@ _comma:
         defword ":", COLON
         .quad   WORD, CREATE, LIT, DOCOL, COMMA, LATEST, FETCH, HIDDEN, RBRAC, EXIT
 
+// ";" clears the hidden bit rather than toggling it, so a stray ";" can't
+// hide the last finished word.
         defword ";", SEMICOLON, F_IMMED
-        .quad   LIT, EXIT, COMMA, LATEST, FETCH, HIDDEN, LBRAC, EXIT
+        .quad   LIT, EXIT, COMMA, LATEST, FETCH, INCR8, DUP, FETCHBYTE
+        .quad   __F_HIDDEN, INVERT, AND, SWAP, STOREBYTE, LBRAC, EXIT
 
 // ---------------------------------------------------------------- control
 

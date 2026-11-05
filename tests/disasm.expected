@@ -1,48 +1,52 @@
 CODE DUP
-   0  ldr     x0, [x20]
-   4  str     x0, [x20, #-0x8]!
-   8  NEXT
+   0  str     x22, [x20, #-0x8]!
+   4  NEXT
 END-CODE
 CODE SWAP
-   0  ldp     x0, x1, [x20]
-   4  stp     x1, x0, [x20]
-   8  NEXT
+   0  ldr     x0, [x20]
+   4  str     x22, [x20]
+   8  mov     x22, x0
+   c  NEXT
 END-CODE
 CODE HERE
    0  adrp    x0, var_HERE@PAGE
    4  add     x0, x0, var_HERE@PAGEOFF
-   8  str     x0, [x20, #-0x8]!
-   c  NEXT
+   8  str     x22, [x20, #-0x8]!
+   c  mov     x22, x0
+  10  NEXT
 END-CODE
 CODE 0BRANCH
-   0  ldr     x0, [x20], #0x8
-   4  cbz     x0, code_BRANCH
-   8  add     x19, x19, #0x8
-   c  NEXT
+   0  mov     x0, x22
+   4  ldr     x22, [x20], #0x8
+   8  cbz     x0, code_BRANCH
+   c  add     x19, x19, #0x8
+  10  NEXT
 END-CODE
 CODE EXECUTE
-   0  ldr     x0, [x20], #0x8
-   4  ldr     x1, [x0]
-   8  br      x1
+   0  mov     x0, x22
+   4  ldr     x22, [x20], #0x8
+   8  ldr     x1, [x0]
+   c  br      x1
 END-CODE
 CODE BYE
    0  b       _bye
 END-CODE
 CODE /MOD
-   0  ldr     x0, [x20], #0x8
-   4  ldr     x1, [x20], #0x8
-   8  cbz     x0, +28
-   c  sdiv    x2, x1, x0
-  10  msub    x3, x2, x0, x1
-  14  str     x3, [x20, #-0x8]!
-  18  str     x2, [x20, #-0x8]!
-  1c  NEXT
-  28  adrp    x9, var_DIVZERO@PAGE
-  2c  add     x9, x9, var_DIVZERO@PAGEOFF
-  30  ldr     x0, [x9]
-  34  cbz     x0, +c
-  38  ldr     x1, [x0]
-  3c  br      x1
+   0  cbz     x22, +24
+   4  ldr     x1, [x20]
+   8  sdiv    x2, x1, x22
+   c  msub    x3, x2, x22, x1
+  10  str     x3, [x20]
+  14  mov     x22, x2
+  18  NEXT
+  24  adrp    x9, var_DIVZERO@PAGE
+  28  add     x9, x9, var_DIVZERO@PAGEOFF
+  2c  ldr     x0, [x9]
+  30  cbz     x0, +4
+  34  ldr     x22, [x20, #0x8]
+  38  add     x20, x20, #0x10
+  3c  ldr     x1, [x0]
+  40  br      x1
 END-CODE
 CODE IMMEDIATE
    0  adrp    x9, var___LATEST@PAGE
@@ -54,47 +58,49 @@ CODE IMMEDIATE
   18  NEXT
 END-CODE
 CODE ?DUP
-   0  ldr     x0, [x20]
-   4  cbz     x0, +c
-   8  str     x0, [x20, #-0x8]!
-   c  NEXT
+   0  cbz     x22, +8
+   4  str     x22, [x20, #-0x8]!
+   8  NEXT
 END-CODE
 CODE CMOVE
-   0  ldr     x2, [x20], #0x8
-   4  ldr     x1, [x20], #0x8
-   8  ldr     x0, [x20], #0x8
-   c  cbz     x2, +20
-  10  ldrb    w3, [x0], #0x1
-  14  strb    w3, [x1], #0x1
-  18  sub     x2, x2, #0x1
-  1c  b       +c
-  20  NEXT
+   0  mov     x2, x22
+   4  ldr     x1, [x20]
+   8  ldr     x0, [x20, #0x8]
+   c  ldr     x22, [x20, #0x10]
+  10  add     x20, x20, #0x18
+  14  cbz     x2, +28
+  18  ldrb    w3, [x0], #0x1
+  1c  strb    w3, [x1], #0x1
+  20  sub     x2, x2, #0x1
+  24  b       +14
+  28  NEXT
 END-CODE
 CODE MS
    0  bl      _flush
-   4  ldr     x0, [x20], #0x8
-   8  mov     x1, #0x3e8
-   c  udiv    x2, x0, x1
-  10  msub    x3, x2, x1, x0
-  14  mul     x3, x3, x1
-  18  stp     x2, x3, [sp, #-0x10]!
-  1c  mov     x0, #0x0
-  20  mov     x1, #0x0
-  24  mov     x2, #0x0
-  28  mov     x3, #0x0
-  2c  mov     x4, sp
-  30  mov     x16, #0x5d
-  34  svc     #0x80
-  38  add     sp, sp, #0x10
-  3c  NEXT
+   4  mov     x0, x22
+   8  ldr     x22, [x20], #0x8
+   c  mov     x1, #0x3e8
+  10  udiv    x2, x0, x1
+  14  msub    x3, x2, x1, x0
+  18  mul     x3, x3, x1
+  1c  stp     x2, x3, [sp, #-0x10]!
+  20  mov     x0, #0x0
+  24  mov     x1, #0x0
+  28  mov     x2, #0x0
+  2c  mov     x3, #0x0
+  30  mov     x4, sp
+  34  mov     x16, #0x5d
+  38  svc     #0x80
+  3c  add     sp, sp, #0x10
+  40  NEXT
 END-CODE
    0  add     x1, x0, #0x10
-   4  str     x1, [x20, #-0x8]!
-   8  ldr     x2, [x0, #0x8]
-   c  cbz     x2, +18
-  10  str     x19, [x21, #-0x8]!
-  14  mov     x19, x2
-  18  NEXT
+   4  str     x22, [x20, #-0x8]!
+   8  mov     x22, x1
+   c  ldr     x2, [x0, #0x8]
+  10  cbz     x2, +1c
+  14  str     x19, [x21, #-0x8]!
+  18  mov     x19, x2
 : SQ DUP * ;
 -1 
 movk    x3, #0x1234, lsl #16

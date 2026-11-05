@@ -17,6 +17,7 @@ itself in Forth.
 make            # build
 make repl       # interactive: type Forth, ctrl-D to quit
 make demo
+make test
 ./ember core.fs demos/life.fs
 ```
 

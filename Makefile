@@ -7,4 +7,7 @@ repl: ember
 demo: ember
 	./ember core.fs demos/mandel.fs demos/self.fs demos/life.fs
 
-.PHONY: repl demo
+test: ember
+	./tests/run.sh
+
+.PHONY: repl demo test

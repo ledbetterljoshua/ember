@@ -1,0 +1,12 @@
+<3> 1 2 3 
+49 
+-42 FF 
+2432902008176640000 
+   0   1   2   3
+   0   2   4   6
+   0   3   6   9
+hi there
+42 
+: FACT DUP 1 > 0BRANCH ( 56 ) DUP 1- FACT * BRANCH ( 32 ) DROP 1 ;
+nosuchword ?
+0 

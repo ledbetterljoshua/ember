@@ -314,7 +314,8 @@ _key:
 
 _bye:
         bl      _flush
-        mov     x0, #0
+        LOADADDR x0, var_STATUS         // exit status: 1 once any error was reported
+        ldr     x0, [x0]
         mov     x16, #SYS_exit
         svc     #0x80
 
@@ -351,6 +352,9 @@ _emit:
 
 // _to_err / _to_out: switch the output stream, flushing what's buffered first
 _to_err:
+        LOADADDR x9, var_STATUS
+        mov     x10, #1
+        str     x10, [x9]
         mov     x9, #2
         b       1f
 _to_out:
@@ -784,6 +788,7 @@ _comma:
         defvar  "LATEST", __LATEST, name_STACKFAULT
         defvar  "S0", SZ
         defvar  "BASE", BASE, 10
+        defvar  "STATUS", STATUS        // process exit status
         defvar  "OUT", OUT, 1           // fd that EMIT and TELL write to
         defvar  "DELIM", DELIM, 10      // the byte that ended the last WORD
         defvar  "DIVZERO", DIVZERO      // xt that /MOD runs when b = 0

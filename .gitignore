@@ -1,3 +1,4 @@
 ember
 *.o
 *.wav
+out/

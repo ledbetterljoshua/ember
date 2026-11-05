@@ -64,7 +64,7 @@ HERE @ 0 , : UNCLOSED LITERAL ;
 : SPACES ( n -- ) BEGIN DUP 0> WHILE SPACE 1- REPEAT DROP ;
 : ARSHIFT ( n u -- n' ) OVER 0< IF SWAP INVERT SWAP RSHIFT INVERT ELSE RSHIFT THEN ;
 ( Errors go to stderr, so a program writing binary to stdout stays intact. )
-: >ERR FLUSH 2 OUT ! ;
+: >ERR FLUSH 2 OUT ! 1 STATUS ! ;  ( any error makes the exit status 1 )
 : >OUT FLUSH 1 OUT ! ;
 : DECIMAL 10 BASE ! ;
 : HEX 16 BASE ! ;

@@ -1,0 +1,5 @@
+50 : F 7 DUP * 1+ ;
+25 
+0 4 9 45 
+1235 : H 1234 1+ ;
+INLINE needs a colon word: V

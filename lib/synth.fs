@@ -15,16 +15,19 @@
 
 ( ---- Fixed point ---- )
 : 2OVER ( a b c d -- a b c d a b ) 3 PICK 3 PICK ;
-: G* ( s g -- s' ) * 65536 / ;
+: G* ( s g -- s' ) 65536 */ ;
 : MSEC ( ms -- samples ) RATE * 1000 / ;
 : TAU ( ms -- k ) MSEC 1 MAX 1048576 SWAP / 1048576 SWAP - ;
 : FADE ( var k -- ) OVER @ * 1048576 / SWAP ! ;
 ( Velocity 1-9 to a gain, squared so ghost notes really are quiet. )
 : VEL ( 1-9 -- g ) DUP * 65536 * 81 / ;
 : HZ>INC ( hz -- inc ) 97391 * ;
+INLINE G*  INLINE FADE  INLINE 2OVER
 4294967295 CONSTANT MASK32
-( Fields: offset size "name" -- offset'. The word adds its offset. )
-: +FIELD <BUILDS OVER , + DOES> @ + ;
+( Fields: offset size "name" -- offset'. The word adds its offset; inside
+  a definition it compiles the addition in place. )
+: +FIELD <BUILDS OVER , + [COMPILE] IMMEDIATE
+    DOES> @ STATE @ IF ?DUP IF [COMPILE] LITERAL ['] + , THEN ELSE + THEN ;
 : FIELD ( offset "name" -- offset' ) 8 +FIELD ;
 
 ( ---- Band-limited oscillators. A naive sawtooth jumps once a cycle and
@@ -48,6 +51,7 @@
     2DUP SAW -ROT SWAP 2147483648 + MASK32 AND SWAP SAW - 2 / ;
 ( Advance a phase variable and read a band-limited saw from it. )
 : SAW-OSC ( phvar inc -- s ) TUCK OVER @ + MASK32 AND TUCK SWAP ! SWAP SAW ;
+INLINE SAW-OSC
 
 ( ---- ADSR. Attack is linear, decay and release are exponential. ---- )
 0 FIELD E.LEVEL  FIELD E.STAGE  FIELD E.ATK  FIELD E.DEC  FIELD E.SUS  FIELD E.REL
@@ -78,12 +82,14 @@ CONSTANT /ENV
     3 = IF DUP RELEASES THEN THEN THEN
     E.LEVEL @ 8 RSHIFT ;
 : SOUNDING? ( env -- f ) E.STAGE @ DUP 1 = SWAP 2 = OR ;
+INLINE ATTACKS  INLINE RELEASES  INLINE ENV  INLINE SOUNDING?
 
 ( ---- State-variable filter (Chamberlin), resonant, two poles.
   f = 2 sin(pi fc / rate), about fc * 2 pi / rate below a few kHz; q is
   1/Q in Q16, so 65536 is gentle and 10000 rings. ---- )
 0 FIELD S.LOW  FIELD S.BAND  FIELD S.HIGH  CONSTANT /SVF
 : HZ>F ( hz -- f ) 9337 * 1000 / 20 MAX 65536 MIN ;
+INLINE HZ>F
 VARIABLE SF  VARIABLE SQ
 : SVF ( in f q svf -- low )
     >R SQ ! SF !
@@ -96,6 +102,7 @@ VARIABLE SF  VARIABLE SQ
 ( ---- Two-operator FM: a sine whose phase is pushed around by another.
   The index is in hundredths of a radian. ---- )
 : FM ( carrier-ph modulator-ph index -- s ) SWAP SIN * 417 * + SIN ;
+INLINE FM
 
 ( ---- Soft clip: x(27 + x^2) / (27 + 9x^2), a rational tanh. Full scale
   in is 1.0; it reaches 1.0 out at three times that. ---- )
@@ -104,6 +111,7 @@ VARIABLE SF  VARIABLE SQ
     DUP DUP * 32768 /
     DUP 884736 + SWAP 9 * 884736 +
     >R * R> / ;
+INLINE SOFTCLIP
 
 ( ---- Buses. Instruments add to LEFT and RIGHT, and send to the echo and
   the reverb. ---- )
@@ -127,6 +135,7 @@ VARIABLE DUCK-FLOOR  65536 DUCK-FLOOR !
     65536 DUCK @ - DUCK-K @ * 1048576 / 65536 SWAP - DUCK ! ;
 ( Half the duck, for things that should only lean back a little. )
 : HALF-DUCK ( s -- s' ) DUCK @ 65536 + 2 / G* ;
+INLINE HALF-DUCK
 
 ( ---- Reverb after Freeverb: eight damped combs in parallel, then four
   allpasses in series, per side; the right side's lines are 23 samples
@@ -136,16 +145,16 @@ VARIABLE DUCK-FLOOR  65536 DUCK-FLOOR !
 VARIABLE ROOM  55050 ROOM !        ( comb feedback, 0.84 )
 VARIABLE DAMP  13107 DAMP !        ( 0.2: how fast highs die in the tail )
 VARIABLE RWET  2200 RWET !
-VARIABLE CIN
+VARIABLE KEEP                      ( 65536 - DAMP, set once per sample )
 : NEXT-SLOT ( line -- ) DUP 8+ @ 1+ DUP 2 PICK @ >= IF DROP 0 THEN SWAP 8+ ! ;
+INLINE NEXT-SLOT
 : COMB-RUN ( in comb -- out )
-    SWAP CIN !
-    DUP 8+ @ CELLS OVER 24 + +
+    >R  R@ 8+ @ CELLS R@ 24 + +
     DUP @
-    DUP 65536 DAMP @ - G*  3 PICK 16 + @ DAMP @ G* +
-    DUP 4 PICK 16 + !
-    ROOM @ G* CIN @ + ROT !
-    SWAP NEXT-SLOT ;
+    DUP KEEP @ G*  R@ 16 + @ DAMP @ G* +
+    DUP R@ 16 + !
+    ROOM @ G*  3 PICK +  ROT !  NIP
+    R> NEXT-SLOT ;
 : AP-RUN ( in allpass -- out )
     DUP 8+ @ CELLS OVER 16 + +
     DUP @
@@ -168,7 +177,7 @@ VARIABLE CIN
     OVER CR4 COMB-RUN + OVER CR5 COMB-RUN + OVER CR6 COMB-RUN +
     OVER CR7 COMB-RUN + SWAP CR8 COMB-RUN +
     AR1 AP-RUN AR2 AP-RUN AR3 AP-RUN AR4 AP-RUN ;
-: REVERB ( in -- l r ) 4 / DUP REVERB-L SWAP REVERB-R ;
+: REVERB ( in -- l r ) 65536 DAMP @ - KEEP !  4 / DUP REVERB-L SWAP REVERB-R ;
 
 ( ---- Voices. Every pitched instrument uses this layout. ---- )
 0 FIELD >PH1  FIELD >PH2  FIELD >INC  FIELD >INC2  FIELD >TINC

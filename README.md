@@ -25,8 +25,14 @@ itself in Forth.
   a stereo WAV on stdout; and `fire.fs`, a fire in 24-bit color that burns for
   a while and then goes out.
 - `lib/tracker.fs`: the studio the songs share: sine table, tuning, score
-  readers, envelopes, mixing, echo and a WAV renderer. Load it before a song:
+  readers (notes with velocities, lead-sheet chords like `Bbm9` and `Eb/G`,
+  arrangements), swing, mixing, echo and a WAV renderer. Load it before a song:
   `./ember core.fs lib/tracker.fs demos/lantern.fs > lantern.wav`.
+- `lib/synth.fs`: instruments on top of the tracker, all integer fixed point:
+  PolyBLEP oscillators, ADSR, a resonant state-variable filter, two-operator
+  FM, a Freeverb-style reverb, sidechain ducking and a soft-clip master, as
+  pads, plucks, bass, lead, bells and drums. `demos/selfhost.fs` is a
+  two-and-a-half-minute piece written with it.
 
 ```
 make            # build
@@ -36,6 +42,7 @@ make test
 make song       # renders demos/song.fs to kindling.wav and plays it
 make bench      # CPU cycles per benchmark (bench/run.sh ../other . compares)
 make lantern    # renders demos/lantern.fs to lantern.wav and plays it
+make selfhost   # renders demos/selfhost.fs to out/self-hosting.wav (30 s) and plays it
 ./ember core.fs demos/life.fs
 ./ember core.fs lib/disasm.fs -    # REPL where SEE DUP reads as assembly
 ```

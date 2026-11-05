@@ -31,6 +31,8 @@
         .set SYS_sigaction, 46
         .set SYS_mprotect, 74
         .set SYS_select, 93
+        .set SYS_ioctl,  54
+        .set TIOCGETA,   0x40487413
 
 // Each stack sits between PROT_NONE guard pages, so running off either end
 // faults at once instead of overwriting the dictionary or kernel variables.
@@ -1050,6 +1052,21 @@ _comma:
 
         defword "QUIT", QUIT
         .quad   RZ, RSPSTORE, INTERPRET, BRANCH, -16
+
+        defaddr "SOURCE-FD", SOURCE_FD, cur_fd   // fd input is being read from
+
+        defcode "TTY?", TTYQ            // fd -- f   (is fd a terminal?)
+        POP     x0
+        sub     sp, sp, #80             // struct termios, discarded
+        mov     x1, #(TIOCGETA & 0xffff)
+        movk    x1, #(TIOCGETA >> 16), lsl #16
+        mov     x2, sp
+        mov     x16, #SYS_ioctl
+        svc     #0x80
+        add     sp, sp, #80
+        csetm   x0, cc                  // carry clear: the ioctl succeeded
+        PUSH    x0
+        NEXT
 
         defcode "BYE", BYE
         b       _bye

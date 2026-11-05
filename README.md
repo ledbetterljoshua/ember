@@ -36,7 +36,7 @@ itself in Forth.
 
 ```
 make            # build
-make repl       # interactive: type Forth, ctrl-D to quit
+make repl       # interactive (prints "ok" after each line); ctrl-D to quit
 make demo
 make test
 make song       # renders demos/song.fs to kindling.wav and plays it

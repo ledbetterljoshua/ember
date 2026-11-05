@@ -21,4 +21,14 @@ for t in tests/*.fs; do
     [ "$got" = "$want" ] || echo "     exit status $got, expected $want"; fail=1
   fi
 done
+# The REPL at a terminal: read tests/repl.lines through a pseudo-terminal.
+if command -v python3 > /dev/null; then
+  set --
+  while IFS= read -r line; do set -- "$@" "$line"; done < tests/repl.lines
+  if python3 -I tests/pty.py "$@" | diff -u tests/repl.expected - > /dev/null; then
+    echo "ok   tests/repl.lines (pty)"
+  else
+    echo "FAIL tests/repl.lines (pty)"; python3 -I tests/pty.py "$@" | diff -u tests/repl.expected - | head -20; fail=1
+  fi
+fi
 exit $fail

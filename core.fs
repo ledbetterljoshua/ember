@@ -199,7 +199,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
   half-built definition stays hidden and keeps compiling the following lines,
   and an underflowed stack stays underflowed. From here on the outer
   interpreter is Forth, and an error resets the system to a known state. )
-: RESET ( -- ) S0 @ DSP!
+: RESET ( -- ) S0 @ DSP!  0 DELIM !  ( no "ok" for a line that failed )
     STATE @ IF
         LATEST @ DUP HIDDEN? IF DUP @ LATEST ! HERE ! ELSE DROP THEN
         0 STATE !
@@ -209,7 +209,9 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
 ( WORD and KEY give a 0 at the end of each source, so skipping stops there. )
 : EOL? ( c -- f ) DUP 10 = SWAP 0= OR ;
 : SKIP-LINE ( -- ) DELIM @ EOL? IF EXIT THEN BEGIN KEY EOL? UNTIL ;
-: SKIP-REST ( -- ) STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF EXIT THEN THEN SKIP-LINE ;
+: SKIP-REST ( -- ) ( at a terminal, never wait for a ";" that may not come )
+    STATE @ IF LATEST @ HIDDEN? SOURCE-FD @ TTY? NOT AND IF SKIP-DEF EXIT THEN THEN
+    SKIP-LINE ;
 : ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT SKIP-REST RESET THEN ;
 ( INTERPRET compiles or pushes what it can, and hands back a word to run so
   that QUIT runs it with nothing of INTERPRET's on the return stack. )
@@ -226,7 +228,12 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
     2DUP NUMBER 0= IF NIP NIP STATE @ IF ' LIT , , THEN FALSE EXIT THEN
     >ERR DROP TELL ."  ?" CR >OUT
     SKIP-REST RESET FALSE ;
-: QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK AGAIN ;
+( At a terminal, say "ok" after each line that finished cleanly. )
+: PROMPT? ( -- f )
+    DELIM @ 10 <> STATE @ OR IF FALSE EXIT THEN
+    SOURCE-FD @ TTY? 1 TTY? AND ;
+: QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK
+    PROMPT? IF ."  ok" CR THEN AGAIN ;
 : ABORT ( -- ) SKIP-REST RESET QUIT ;
 ( The kernel's /MOD runs the xt in DIVZERO when dividing by zero. )
 : DIVISION-BY-ZERO ( -- ) >ERR ." division by zero" CR >OUT ABORT ;

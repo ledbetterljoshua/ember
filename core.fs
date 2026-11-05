@@ -209,4 +209,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
     SKIP-REST RESET FALSE ;
 : QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK AGAIN ;
 : ABORT ( -- ) SKIP-REST RESET QUIT ;
+( The kernel's /MOD runs the xt in DIVZERO when dividing by zero. )
+: DIVISION-BY-ZERO ( -- ) >ERR ." division by zero" CR >OUT ABORT ;
+' DIVISION-BY-ZERO DIVZERO !
 QUIT

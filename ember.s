@@ -553,11 +553,17 @@ _comma:
         defcode "/MOD", DIVMOD          // a b -- rem quot (truncating)
         POP     x0
         POP     x1
-        sdiv    x2, x1, x0
+        cbz     x0, 2f
+1:      sdiv    x2, x1, x0
         msub    x3, x2, x0, x1
         PUSH    x3
         PUSH    x2
         NEXT
+2:      LOADADDR x9, var_DIVZERO        // b = 0: run the handler, if set;
+        ldr     x0, [x9]                // otherwise sdiv's quiet 0
+        cbz     x0, 1b
+        ldr     x1, [x0]
+        br      x1
 
         defcode "NEGATE", NEGATE
         ldr     x0, [x20]
@@ -722,6 +728,7 @@ _comma:
         defvar  "BASE", BASE, 10
         defvar  "OUT", OUT, 1           // fd that EMIT and TELL write to
         defvar  "DELIM", DELIM, 10      // the byte that ended the last WORD
+        defvar  "DIVZERO", DIVZERO      // xt that /MOD runs when b = 0
 
         defaddr "R0", RZ, return_stack, RSTACK_SIZE
         defaddr "DOCOL", __DOCOL, DOCOL

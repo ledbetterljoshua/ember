@@ -154,3 +154,8 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         DUP DICT0 U< IF >R 1+ R> ELSE >R SWAP 1+ SWAP R> THEN @
     REPEAT ;
 : BANNER CENSUS ." ember: " . ." words in arm64, " . ." grown in Forth" CR ;
+
+( The kernel's ' only works compiled: at top level it pushed the next cell of
+  QUIT and skipped it, which crashed. This one reads the next word in both
+  states, and compiles it as a literal so an immediate word can be ticked. )
+: ' IMMEDIATE WORD FIND >CFA STATE @ IF ' LIT , , THEN ;

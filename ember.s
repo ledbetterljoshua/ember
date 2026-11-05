@@ -261,7 +261,8 @@ _key:
 6:      LOADADDR x9, cur_fd
         str     x0, [x9]
         b       2b
-7:      LOADADDR x0, msg_noopen
+7:      bl      _to_err
+        LOADADDR x0, msg_noopen
         bl      _cstr
         LOADADDR x9, err_path
         ldr     x0, [x9]
@@ -310,13 +311,28 @@ _emit:
         str     x10, [x9]
         ret
 
+// _to_err / _to_out: switch the output stream, flushing what's buffered first
+_to_err:
+        mov     x9, #2
+        b       1f
+_to_out:
+        mov     x9, #1
+1:      ENTER
+        str     x9, [sp, #-16]!
+        bl      _flush
+        ldr     x9, [sp], #16
+        LOADADDR x10, var_OUT
+        str     x9, [x10]
+        LEAVE
+
 _flush:
         LOADADDR x9, outlen
         ldr     x2, [x9]
         cbz     x2, 2f
         str     xzr, [x9]
         LOADADDR x1, output_buffer
-1:      mov     x0, #1
+1:      LOADADDR x0, var_OUT
+        ldr     x0, [x0]
         mov     x16, #SYS_write
         stp     x1, x2, [sp, #-16]!
         svc     #0x80
@@ -702,6 +718,7 @@ _comma:
         defvar  "LATEST", LATEST, name_BYE
         defvar  "S0", SZ
         defvar  "BASE", BASE, 10
+        defvar  "OUT", OUT, 1           // fd that EMIT and TELL write to
 
         defaddr "R0", RZ, return_stack, RSTACK_SIZE
         defaddr "DOCOL", __DOCOL, DOCOL
@@ -935,7 +952,8 @@ _comma:
         NEXT
 4:      PUSH    x26
         NEXT
-5:      mov     x24, x26                // unknown: print "word ?"
+5:      bl      _to_err                 // unknown: "word ?" to stderr
+        mov     x24, x26
         mov     x25, x27
 6:      cbz     x25, 7f
         ldrb    w0, [x24], #1
@@ -948,6 +966,7 @@ _comma:
         bl      _emit
         mov     w0, #10
         bl      _emit
+        bl      _to_out
         NEXT
 
         defword "QUIT", QUIT

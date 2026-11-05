@@ -31,11 +31,18 @@ END-CODE
 CODE /MOD
    0  ldr     x0, [x20], #0x8
    4  ldr     x1, [x20], #0x8
-   8  sdiv    x2, x1, x0
-   c  msub    x3, x2, x0, x1
-  10  str     x3, [x20, #-0x8]!
-  14  str     x2, [x20, #-0x8]!
-  18  NEXT
+   8  cbz     x0, +28
+   c  sdiv    x2, x1, x0
+  10  msub    x3, x2, x0, x1
+  14  str     x3, [x20, #-0x8]!
+  18  str     x2, [x20, #-0x8]!
+  1c  NEXT
+  28  adrp    x9, var_DIVZERO@PAGE
+  2c  add     x9, x9, var_DIVZERO@PAGEOFF
+  30  ldr     x0, [x9]
+  34  cbz     x0, +c
+  38  ldr     x1, [x0]
+  3c  br      x1
 END-CODE
 CODE IMMEDIATE
    0  adrp    x9, var_LATEST@PAGE

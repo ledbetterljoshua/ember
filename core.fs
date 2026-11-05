@@ -42,10 +42,15 @@
 : WHILE IMMEDIATE ' 0BRANCH , HERE @ 0 , ;
 : REPEAT IMMEDIATE ' BRANCH , SWAP HERE @ - , DUP HERE @ SWAP - SWAP ! ;
 
+\ KEY gives 0 at the end of a source. A word reading raw input that hits it
+\ records here the character it was waiting for; the interpreter reports it.
+HERE @ 0 , : UNCLOSED LITERAL ;
+
 \ Now the language can describe its own comments.
 : ( IMMEDIATE
     1 BEGIN
-        KEY DUP '(' = IF DROP 1+ ELSE ')' = IF 1- THEN THEN
+        KEY DUP 0= IF ')' UNCLOSED ! 2DROP EXIT THEN
+        DUP '(' = IF DROP 1+ ELSE ')' = IF 1- THEN THEN
     DUP 0= UNTIL DROP ;
 
 ( From here on, comments look like this. They nest ( like this ). )
@@ -101,18 +106,20 @@
 : ALLOT ( n -- ) HERE +! ;
 
 ( Strings. S" leaves addr len; ." prints. Both work compiled or interpreted. )
+: STRING-KEY ( -- c | 0 at the closing quote )
+    KEY DUP 0= IF '"' UNCLOSED ! THEN DUP '"' = IF DROP 0 THEN ;
 : S" IMMEDIATE
     STATE @ IF
         ' LITSTRING , HERE @ 0 ,
-        BEGIN KEY DUP '"' <> WHILE C, REPEAT DROP
+        BEGIN STRING-KEY ?DUP WHILE C, REPEAT
         DUP HERE @ SWAP - 8- SWAP ! ALIGN
     ELSE
-        HERE @ BEGIN KEY DUP '"' <> WHILE OVER C! 1+ REPEAT DROP
+        HERE @ BEGIN STRING-KEY ?DUP WHILE OVER C! 1+ REPEAT
         HERE @ - HERE @ SWAP
     THEN ;
 : ." IMMEDIATE
     STATE @ IF [COMPILE] S" ' TELL ,
-    ELSE BEGIN KEY DUP '"' = IF DROP EXIT THEN EMIT AGAIN THEN ;
+    ELSE BEGIN STRING-KEY ?DUP WHILE EMIT REPEAT THEN ;
 
 ( Defining words. A constant is a tiny colon definition that pushes its value. )
 : CONSTANT ( n -- ) WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
@@ -197,20 +204,31 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         LATEST @ DUP HIDDEN? IF DUP @ LATEST ! HERE ! ELSE DROP THEN
         0 STATE !
     THEN ;
-( After an error inside a definition, skip to its ";" rather than run the rest. )
-: SKIP-DEF ( -- ) BEGIN WORD 1 = SWAP C@ ';' = AND UNTIL ;
-: ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT RESET THEN ;
+: SKIP-DEF ( -- ) BEGIN WORD DUP 0= IF 2DROP EXIT THEN 1 = SWAP C@ ';' = AND UNTIL ;
+( After an error, skip the rest of the line, or the rest of a definition. )
+( WORD and KEY give a 0 at the end of each source, so skipping stops there. )
+: EOL? ( c -- f ) DUP 10 = SWAP 0= OR ;
+: SKIP-LINE ( -- ) DELIM @ EOL? IF EXIT THEN BEGIN KEY EOL? UNTIL ;
+: SKIP-REST ( -- ) STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF EXIT THEN THEN SKIP-LINE ;
+: ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT SKIP-REST RESET THEN ;
 ( INTERPRET compiles or pushes what it can, and hands back a word to run so
   that QUIT runs it with nothing of INTERPRET's on the return stack. )
 : INTERPRET ( -- xt true | false )
-    WORD 2DUP FIND ?DUP IF
+    UNCLOSED @ ?DUP IF 0 UNCLOSED !
+        >ERR ." end of input before " EMIT CR >OUT RESET FALSE EXIT THEN
+    WORD DUP 0= IF 2DROP
+        STATE @ IF >ERR ." end of input inside a definition" CR >OUT RESET THEN
+        FALSE EXIT THEN
+    2DUP FIND ?DUP IF
         NIP NIP DUP >CFA SWAP 8+ C@ F_IMMED AND STATE @ 0= OR
         IF TRUE EXIT THEN , FALSE EXIT
     THEN
     2DUP NUMBER 0= IF NIP NIP STATE @ IF ' LIT , , THEN FALSE EXIT THEN
     >ERR DROP TELL ."  ?" CR >OUT
-    STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF THEN THEN
-    RESET FALSE ;
+    SKIP-REST RESET FALSE ;
 : QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK AGAIN ;
-: ABORT ( -- ) RESET QUIT ;
+: ABORT ( -- ) SKIP-REST RESET QUIT ;
+( The kernel's /MOD runs the xt in DIVZERO when dividing by zero. )
+: DIVISION-BY-ZERO ( -- ) >ERR ." division by zero" CR >OUT ABORT ;
+' DIVISION-BY-ZERO DIVZERO !
 QUIT

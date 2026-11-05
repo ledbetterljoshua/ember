@@ -227,13 +227,22 @@ _key:
         str     x1, [x9]
         ldp     x29, x30, [sp], #16
         b       _key
-3:      LOADADDR x9, cur_fd             // source exhausted: close, advance
-        ldr     x0, [x9]
-        mov     x10, #-1
+3:      LOADADDR x9, cur_fd             // source exhausted: close it and hand
+        ldr     x0, [x9]                // back one 0 byte to mark its end; the
+        mov     x10, #-1                // next refill opens the next source
         str     x10, [x9]
-        cbz     x0, 4f
+        cbz     x0, 1f
         mov     x16, #SYS_close
         svc     #0x80
+1:      LOADADDR x1, input_buffer
+        strb    wzr, [x1]
+        LOADADDR x9, currkey
+        str     x1, [x9]
+        add     x1, x1, #1
+        LOADADDR x9, bufftop
+        str     x1, [x9]
+        ldp     x29, x30, [sp], #16
+        b       _key
 4:      LOADADDR x9, src_index
         ldr     x10, [x9]
         LOADADDR x11, src_argc
@@ -348,6 +357,7 @@ _flush:
 _word:
         ENTER
 1:      bl      _key
+        cbz     w0, 6f                  // end of a source: an empty word
         cmp     w0, #92                 // backslash
         b.eq    4f
         cmp     w0, #32
@@ -361,15 +371,26 @@ _word:
 3:      bl      _key
         cmp     w0, #32
         b.hi    2b
-        LOADADDR x9, var_DELIM          // what ended the word: newline or not
+        cbnz    w0, 5f                  // a 0 ended the word: put it back so
+        LOADADDR x9, currkey            // the next WORD sees the end too
+        ldr     x10, [x9]
+        sub     x10, x10, #1
+        str     x10, [x9]
+5:      LOADADDR x9, var_DELIM          // what ended the word: newline or not
         str     x0, [x9]
         mov     x0, x24
         sub     x1, x25, x24
         LEAVE
 4:      bl      _key
+        cbz     w0, 6f
         cmp     w0, #10
         b.ne    4b
         b       1b
+6:      LOADADDR x9, var_DELIM
+        str     xzr, [x9]
+        LOADADDR x0, word_buffer
+        mov     x1, #0
+        LEAVE
 
 // _number: x0 = addr, x1 = len -> x0 = value, x1 = count of unparsed chars
 _number:
@@ -932,7 +953,9 @@ _comma:
 
         defcode "INTERPRET", INTERPRET
         bl      _word
-        mov     x26, x0
+        cbnz    x1, 2f
+        NEXT                            // end of a source
+2:      mov     x26, x0
         mov     x27, x1
         bl      _find
         cbz     x0, 3f

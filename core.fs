@@ -192,15 +192,18 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         LATEST @ DUP HIDDEN? IF DUP @ LATEST ! HERE ! ELSE DROP THEN
         0 STATE !
     THEN ;
-: SKIP-DEF ( -- ) BEGIN WORD 1 = SWAP C@ ';' = AND UNTIL ;
+: SKIP-DEF ( -- ) BEGIN WORD DUP 0= IF 2DROP EXIT THEN 1 = SWAP C@ ';' = AND UNTIL ;
 ( After an error, skip the rest of the line, or the rest of a definition. )
-: SKIP-LINE ( -- ) DELIM @ 10 = IF EXIT THEN BEGIN KEY 10 = UNTIL ;
+( WORD and KEY give a 0 at the end of each source, so skipping stops there. )
+: EOL? ( c -- f ) DUP 10 = SWAP 0= OR ;
+: SKIP-LINE ( -- ) DELIM @ EOL? IF EXIT THEN BEGIN KEY EOL? UNTIL ;
 : SKIP-REST ( -- ) STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF EXIT THEN THEN SKIP-LINE ;
 : ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT SKIP-REST RESET THEN ;
 ( INTERPRET compiles or pushes what it can, and hands back a word to run so
   that QUIT runs it with nothing of INTERPRET's on the return stack. )
 : INTERPRET ( -- xt true | false )
-    WORD 2DUP FIND ?DUP IF
+    WORD DUP 0= IF 2DROP FALSE EXIT THEN
+    2DUP FIND ?DUP IF
         NIP NIP DUP >CFA SWAP 8+ C@ F_IMMED AND STATE @ 0= OR
         IF TRUE EXIT THEN , FALSE EXIT
     THEN

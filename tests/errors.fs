@@ -10,9 +10,12 @@ FOO
   3 4 + . ;
 5 6 + . CR
 \ An error empties the stack.
-1 2 3 NOPE DEPTH . CR
+1 2 3 NOPE
+DEPTH . CR
 \ Underflow is reported and repaired, instead of DEPTH going negative.
-DROP DROP DEPTH . CR
+DROP
+DROP
+DEPTH . CR
 .S CR
 \ The forgotten definition gives its space back.
 VARIABLE H0 HERE @ H0 !

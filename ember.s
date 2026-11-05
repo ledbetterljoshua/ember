@@ -361,6 +361,8 @@ _word:
 3:      bl      _key
         cmp     w0, #32
         b.hi    2b
+        LOADADDR x9, var_DELIM          // what ended the word: newline or not
+        str     x0, [x9]
         mov     x0, x24
         sub     x1, x25, x24
         LEAVE
@@ -719,6 +721,7 @@ _comma:
         defvar  "S0", SZ
         defvar  "BASE", BASE, 10
         defvar  "OUT", OUT, 1           // fd that EMIT and TELL write to
+        defvar  "DELIM", DELIM, 10      // the byte that ended the last WORD
 
         defaddr "R0", RZ, return_stack, RSTACK_SIZE
         defaddr "DOCOL", __DOCOL, DOCOL

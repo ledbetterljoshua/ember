@@ -192,9 +192,11 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         LATEST @ DUP HIDDEN? IF DUP @ LATEST ! HERE ! ELSE DROP THEN
         0 STATE !
     THEN ;
-( After an error inside a definition, skip to its ";" rather than run the rest. )
 : SKIP-DEF ( -- ) BEGIN WORD 1 = SWAP C@ ';' = AND UNTIL ;
-: ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT RESET THEN ;
+( After an error, skip the rest of the line, or the rest of a definition. )
+: SKIP-LINE ( -- ) DELIM @ 10 = IF EXIT THEN BEGIN KEY 10 = UNTIL ;
+: SKIP-REST ( -- ) STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF EXIT THEN THEN SKIP-LINE ;
+: ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT SKIP-REST RESET THEN ;
 ( INTERPRET compiles or pushes what it can, and hands back a word to run so
   that QUIT runs it with nothing of INTERPRET's on the return stack. )
 : INTERPRET ( -- xt true | false )
@@ -204,8 +206,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
     THEN
     2DUP NUMBER 0= IF NIP NIP STATE @ IF ' LIT , , THEN FALSE EXIT THEN
     >ERR DROP TELL ."  ?" CR >OUT
-    STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF THEN THEN
-    RESET FALSE ;
+    SKIP-REST RESET FALSE ;
 : QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK AGAIN ;
-: ABORT ( -- ) RESET QUIT ;
+: ABORT ( -- ) SKIP-REST RESET QUIT ;
 QUIT

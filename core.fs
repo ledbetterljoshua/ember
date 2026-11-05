@@ -186,6 +186,8 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
   QUIT and skipped it, which crashed. This one reads the next word in both
   states, and compiles it as a literal so an immediate word can be ticked. )
 : ' IMMEDIATE WORD FIND >CFA STATE @ IF ' LIT , , THEN ;
+( ['] is the standard spelling inside definitions, and what SEE prints. )
+: ['] IMMEDIATE [COMPILE] ' ;
 ( Error recovery. The kernel's INTERPRET prints "name ?" and carries on: a
   half-built definition stays hidden and keeps compiling the following lines,
   and an underflowed stack stays underflowed. From here on the outer

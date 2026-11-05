@@ -67,11 +67,18 @@
 ( LEAVE makes the current pass the last one. )
 : LEAVE R> R> DROP R@ >R >R ;
 
+( Unsigned division for d below 2^63. /MOD is signed, so halve u first to
+  keep it positive, then correct the remainder, which is less than 2d. )
+: U/MOD ( u d -- rem quot )
+    >R DUP 1 RSHIFT R@ / 1 LSHIFT
+    SWAP OVER R@ * -
+    DUP R@ U< IF R> DROP ELSE R> - SWAP 1+ SWAP THEN SWAP ;
+
 ( Number output, in the current BASE. )
 : U. ( u -- )
-    BASE @ /MOD ?DUP IF RECURSE THEN
+    BASE @ U/MOD ?DUP IF RECURSE THEN
     DUP 10 < IF '0' ELSE 10 - 'A' THEN + EMIT ;
-: UWIDTH ( u -- digits ) 1 SWAP BEGIN BASE @ / ?DUP WHILE SWAP 1+ SWAP REPEAT ;
+: UWIDTH ( u -- digits ) 1 SWAP BEGIN BASE @ U/MOD NIP ?DUP WHILE SWAP 1+ SWAP REPEAT ;
 : U.R ( u width -- ) SWAP DUP UWIDTH ROT SWAP - SPACES U. ;
 : .R ( n width -- )
     SWAP DUP 0< IF NEGATE 1 SWAP ROT 1- ELSE 0 SWAP ROT THEN

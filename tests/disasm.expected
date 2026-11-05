@@ -45,8 +45,8 @@ CODE /MOD
   3c  br      x1
 END-CODE
 CODE IMMEDIATE
-   0  adrp    x9, var_LATEST@PAGE
-   4  add     x9, x9, var_LATEST@PAGEOFF
+   0  adrp    x9, var___LATEST@PAGE
+   4  add     x9, x9, var___LATEST@PAGEOFF
    8  ldr     x9, [x9]
    c  ldrb    w10, [x9, #0x8]
   10  eor     w10, w10, #0x80

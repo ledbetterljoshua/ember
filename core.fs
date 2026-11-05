@@ -231,4 +231,10 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
 ( The kernel's /MOD runs the xt in DIVZERO when dividing by zero. )
 : DIVISION-BY-ZERO ( -- ) >ERR ." division by zero" CR >OUT ABORT ;
 ' DIVISION-BY-ZERO DIVZERO !
+( The kernel runs STACKFAULT's xt when a stack hits a guard page, with
+  1 or -1 for data stack over- or underflow and 2 or -2 for the return stack. )
+: STACK-FAULT ( code -- )
+    >ERR DUP ABS 2 = IF ." return " THEN
+    0< IF ." stack underflow" ELSE ." stack overflow" THEN CR >OUT ABORT ;
+' STACK-FAULT STACKFAULT !
 QUIT

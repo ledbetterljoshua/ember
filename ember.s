@@ -28,19 +28,25 @@
         .set SYS_write,  4
         .set SYS_open,   5
         .set SYS_close,  6
+        .set SYS_sigaction, 46
         .set SYS_mprotect, 74
         .set SYS_select, 93
 
 // Each stack sits between PROT_NONE guard pages, so running off either end
 // faults at once instead of overwriting the dictionary or kernel variables.
-// Slack above S0 (as deep as the stack) and R0 (a page) lets an underflow
-// reach ?STACK; untouched, it costs no memory.
+// Slack above S0 (48 KB, under its own guard page) and R0 (a page) lets an
+// underflow reach ?STACK; untouched, it costs no memory.
         .set PAGE, 0x4000
         .zerofill __DATA,__bss,guard_low,PAGE,14
         .zerofill __DATA,__bss,data_stack,2*DSTACK_SIZE,14
         .zerofill __DATA,__bss,guard_mid,PAGE,14
         .zerofill __DATA,__bss,return_stack,RSTACK_SIZE+PAGE,14
         .zerofill __DATA,__bss,guard_high,PAGE,14
+// Page numbers of the guards, counting from guard_low, for _fault. The
+// data stack's own guard against underflow is the top page of its slack.
+        .set G_DTOP, 2*DSTACK_SIZE/PAGE
+        .set G_RLOW, G_DTOP + 1
+        .set G_HIGH, G_RLOW + 1 + (RSTACK_SIZE+PAGE)/PAGE
         .zerofill __DATA,__bss,dict_space,DICT_SIZE,4
         .zerofill __DATA,__bss,input_buffer,BUF_SIZE,4
         .zerofill __DATA,__bss,output_buffer,BUF_SIZE,4
@@ -181,7 +187,7 @@ _main:
         LOADADDR x0, guard_mid
         bl      _guard
         LOADADDR x0, guard_high
-        bl      _guard
+        bl      _faults
         LOADADDR x20, data_stack        // empty: x22 is junk that spills to S0
         add     x20, x20, #DSTACK_SIZE
         mov     x22, #0
@@ -779,7 +785,7 @@ _comma:
 
         defvar  "STATE", STATE
         defvar  "HERE", HERE, dict_space
-        defvar  "LATEST", __LATEST, name_BYE
+        defvar  "LATEST", __LATEST, name_STACKFAULT
         defvar  "S0", SZ
         defvar  "BASE", BASE, 10
         defvar  "STATUS", STATUS        // process exit status
@@ -1048,6 +1054,77 @@ _comma:
         defcode "BYE", BYE
         b       _bye
 
+// ---------------------------------------------------------------- faults
+// After every other word, so adding it moved no hot code.
+
+        .text
+        .p2align 2
+_faults:                                // x0 = guard_high; called once by _main
+        mov     x9, sp
+        LOADADDR x10, saved_sp
+        str     x9, [x10]
+        stp     x29, x30, [sp, #-16]!
+        bl      _guard
+        LOADADDR x0, data_stack         // top page of the data stack's slack
+        add     x0, x0, #2*DSTACK_SIZE-PAGE
+        bl      _guard
+        mov     x0, #10                 // SIGBUS: what a guard page raises
+        bl      _catch
+        mov     x0, #11                 // SIGSEGV
+        bl      _catch
+        ldp     x29, x30, [sp], #16
+        ret
+
+_catch:                                 // x0 = signal -> handled by _fault
+        LOADADDR x1, sigact
+        mov     x2, #0
+        mov     x16, #SYS_sigaction
+        svc     #0x80
+        ret
+
+// _fault is installed as the signal trampoline (sa_tramp), so the kernel
+// calls it directly: x2 = signal, x3 = siginfo (si_addr at +24). It never
+// returns to the kernel; SA_NODEFER keeps the signal unblocked for next
+// time. A fault on a guard page resets both stacks and the machine stack and
+// runs the xt in STACKFAULT with 1/-1 (data stack over/underflow) or 2/-2
+// (return stack). Any other fault, or no xt yet, flushes and exits with
+// 128 + signal.
+_fault:
+        ldr     x9, [x3, #24]
+        LOADADDR x10, guard_low
+        sub     x9, x9, x10
+        lsr     x9, x9, #14             // page number from guard_low
+        mov     x12, #1
+        cbz     x9, 2f
+        mov     x12, #-1
+        cmp     x9, #G_DTOP
+        b.eq    2f
+        mov     x12, #2
+        cmp     x9, #G_RLOW
+        b.eq    2f
+        mov     x12, #-2
+        cmp     x9, #G_HIGH
+        b.eq    2f
+1:      mov     x12, x2
+        bl      _flush
+        add     x0, x12, #128
+        mov     x16, #SYS_exit
+        svc     #0x80
+2:      LOADADDR x9, var_STACKFAULT
+        ldr     x0, [x9]
+        cbz     x0, 1b
+        LOADADDR x9, saved_sp
+        ldr     x9, [x9]
+        mov     sp, x9
+        LOADADDR x20, data_stack        // a data stack holding just the code
+        add     x20, x20, #DSTACK_SIZE
+        sub     x20, x20, #8
+        mov     x22, x12
+        LOADADDR x21, return_stack
+        add     x21, x21, #RSTACK_SIZE
+        ldr     x1, [x0]
+        br      x1
+
 // ---------------------------------------------------------------- data
 
         .data
@@ -1062,3 +1139,10 @@ src_argc:       .quad 0
 src_argv:       .quad 0
 err_path:       .quad 0
 msg_noopen:     .asciz "ember: cannot open "
+        .balign 8
+saved_sp:       .quad 0
+sigact:         .quad _fault, _fault    // struct __sigaction: handler, tramp,
+                .long 0, 0x50           // mask, SA_NODEFER | SA_SIGINFO
+
+// Last, so that adding it moved no other code or data.
+        defvar  "STACKFAULT", STACKFAULT // xt run on a guard-page fault

@@ -1,0 +1,41 @@
+\ needs: lib/disasm.fs
+\ SEE on primitives. These follow ember.s: a kernel edit means regenerating.
+SEE DUP
+SEE SWAP
+SEE HERE
+SEE 0BRANCH
+SEE EXECUTE
+SEE BYE
+SEE /MOD
+SEE IMMEDIATE
+SEE ?DUP
+SEE CMOVE
+SEE MS
+DODOES 7 DISASM
+\ SEE still decompiles colon definitions, and calls SEE-ASM for code.
+: SQ DUP * ; SEE SQ
+: HAS? ( xt body -- f )
+    200 BEGIN >R 8+ 2DUP @ = IF 2DROP R> DROP TRUE EXIT THEN R> 1- DUP 0= UNTIL
+    DROP 2DROP FALSE ;
+'' SEE-ASM '' SEE HAS? . CR
+\ Encodings the kernel doesn't use, as objdump -d prints them (pc = 0).
+HEX
+F2A24683 INSN. CR
+12800025 INSN. CR
+A9410861 INSN. CR
+68C10801 INSN. CR
+F862D820 INSN. CR
+389FF020 INSN. CR
+B7400703 INSN. CR
+9200F020 INSN. CR
+32089C20 INSN. CR
+B201F3E0 INSN. CR
+1A9F97E0 INSN. CR
+DA835460 INSN. CR
+9BC27C20 INSN. CR
+EB82FC20 INSN. CR
+0AE21C20 INSN. CR
+D14007FF INSN. CR
+D65F0060 INSN. CR
+DECIMAL
+DEPTH . CR

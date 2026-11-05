@@ -4,15 +4,21 @@
 cd "$(dirname "$0")/.." || exit 1
 fail=0
 # tests/NAME.next1, .next2, ... are read after NAME.fs as further sources.
+# The exit status must be 0, or the number in tests/NAME.exit.
+tmp=$(mktemp) || exit 1
+trap 'rm -f "$tmp"' EXIT
 for t in tests/*.fs; do
   exp="${t%.fs}.expected"
+  want=0; [ -e "${t%.fs}.exit" ] && want=$(cat "${t%.fs}.exit")
   needs=$(sed -n '1s/^\\ needs: //p' "$t")
   set -- "$t"
   for x in "${t%.fs}".next*; do [ -e "$x" ] && set -- "$@" "$x"; done
-  if ./ember core.fs $needs "$@" 2>&1 | diff -u "$exp" - > /dev/null; then
+  got=$( (./ember core.fs $needs "$@" > "$tmp" 2>&1; echo $?) 2>/dev/null )
+  if diff -u "$exp" "$tmp" > /dev/null && [ "$got" = "$want" ]; then
     echo "ok   $t"
   else
-    echo "FAIL $t"; ./ember core.fs $needs "$@" 2>&1 | diff -u "$exp" - | head -20; fail=1
+    echo "FAIL $t"; diff -u "$exp" "$tmp" | head -20
+    [ "$got" = "$want" ] || echo "     exit status $got, expected $want"; fail=1
   fi
 done
 exit $fail

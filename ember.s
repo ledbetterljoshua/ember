@@ -28,10 +28,19 @@
         .set SYS_write,  4
         .set SYS_open,   5
         .set SYS_close,  6
+        .set SYS_mprotect, 74
         .set SYS_select, 93
 
-        .zerofill __DATA,__bss,data_stack,DSTACK_SIZE,4
-        .zerofill __DATA,__bss,return_stack,RSTACK_SIZE,4
+// Each stack sits between PROT_NONE guard pages, so running off either end
+// faults at once instead of overwriting the dictionary or kernel variables.
+// Slack above S0 (as deep as the stack) and R0 (a page) lets an underflow
+// reach ?STACK; untouched, it costs no memory.
+        .set PAGE, 0x4000
+        .zerofill __DATA,__bss,guard_low,PAGE,14
+        .zerofill __DATA,__bss,data_stack,2*DSTACK_SIZE,14
+        .zerofill __DATA,__bss,guard_mid,PAGE,14
+        .zerofill __DATA,__bss,return_stack,RSTACK_SIZE+PAGE,14
+        .zerofill __DATA,__bss,guard_high,PAGE,14
         .zerofill __DATA,__bss,dict_space,DICT_SIZE,4
         .zerofill __DATA,__bss,input_buffer,BUF_SIZE,4
         .zerofill __DATA,__bss,output_buffer,BUF_SIZE,4
@@ -167,6 +176,12 @@ _main:
         LOADADDR x9, cur_fd             // no arguments: read stdin
         str     xzr, [x9]
 1:
+        LOADADDR x0, guard_low
+        bl      _guard
+        LOADADDR x0, guard_mid
+        bl      _guard
+        LOADADDR x0, guard_high
+        bl      _guard
         LOADADDR x20, data_stack        // empty: x22 is junk that spills to S0
         add     x20, x20, #DSTACK_SIZE
         mov     x22, #0
@@ -177,6 +192,13 @@ _main:
         add     x21, x21, #RSTACK_SIZE
         LOADADDR x19, cold_start
         NEXT
+
+_guard:                                 // x0 = page -> PROT_NONE
+        mov     x1, #PAGE
+        mov     x2, #0
+        mov     x16, #SYS_mprotect
+        svc     #0x80
+        ret
 
 DOCOL:
         PUSHRSP x19

@@ -384,6 +384,9 @@ _number:
 
 // _find: x0 = addr, x1 = len -> x0 = header, or 0
 _find:
+        mov     x9, #F_LENMASK          // names are significant to 31 chars
+        cmp     x1, x9
+        csel    x1, x1, x9, ls
         LOADADDR x2, var_LATEST
         ldr     x2, [x2]
 1:      cbz     x2, 5f
@@ -784,7 +787,9 @@ _comma:
         ldr     x5, [x4]
         str     x5, [x3]
         str     x3, [x4]
-        and     x6, x1, #F_LENMASK
+        mov     x6, #F_LENMASK          // keep 31 chars; a masked length
+        cmp     x1, x6                  // would name a different, shorter word
+        csel    x6, x1, x6, ls
         strb    w6, [x3, #8]
         add     x7, x3, #9
         mov     x8, #0

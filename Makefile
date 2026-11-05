@@ -10,4 +10,7 @@ demo: ember
 test: ember
 	./tests/run.sh
 
-.PHONY: repl demo test
+bench: ember
+	./bench/run.sh
+
+.PHONY: repl demo test bench

@@ -18,6 +18,7 @@ make            # build
 make repl       # interactive: type Forth, ctrl-D to quit
 make demo
 make test
+make bench      # CPU cycles per benchmark (bench/run.sh ../other . compares)
 ./ember core.fs demos/life.fs
 ```
 

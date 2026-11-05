@@ -12,6 +12,34 @@
 
   Nothing else may print while it renders: every byte on stdout is audio. )
 
+( ---- Speed. A sample runs through these words millions of times, and in
+  threaded code every call to a short word costs about as much as its body.
+  INLINE name turns an existing straight-line colon word into a macro: in a
+  definition it copies the word's body in place of a call to it; typed at
+  the prompt it runs as before. It is for words with a single EXIT at the
+  end that leave the return stack as they found it. Cells after LIT,
+  branches and loop ends are operands and are copied without a look. ---- )
+: OPERAND? ( xt -- f )
+    DUP ' LIT = OVER ' BRANCH = OR OVER ' 0BRANCH = OR
+    OVER ' (LOOP) = OR SWAP ' (+LOOP) = OR ;
+: COPY-BODY ( xt -- )
+    8+ BEGIN DUP @ DUP ' EXIT <> WHILE
+        DUP , OPERAND? IF 8+ DUP @ , THEN 8+
+    REPEAT 2DROP ;
+: INLINE ( "name" -- )
+    WORD 2DUP FIND >CFA DUP @ DOCOL <> IF
+        DROP >ERR ." INLINE needs a colon word: " TELL CR >OUT EXIT THEN
+    >R CREATE DODOES , 0 , R> , [COMPILE] IMMEDIATE
+    DOES> @ STATE @ IF COPY-BODY ELSE EXECUTE THEN ;
+( Constants made from here on compile as literals inside definitions. )
+: CONSTANT ( n "name" -- ) <BUILDS , [COMPILE] IMMEDIATE
+    DOES> @ STATE @ IF [COMPILE] LITERAL THEN ;
+INLINE /  INLINE MOD  INLINE CELLS  INLINE NIP  INLINE TUCK
+INLINE MIN  INLINE MAX  INLINE ABS
+( PICK again, compiled now that CELLS is inline, so that it inlines whole. )
+: PICK ( xn .. x0 n -- xn .. x0 xn ) 1+ CELLS DSP@ + @ ;
+INLINE PICK
+
 44100 CONSTANT RATE
 1 30 LSHIFT CONSTANT FIX          ( fixed-point 1.0 for tables and amplitudes )
 VARIABLE STEPLEN                  ( samples per step )
@@ -35,6 +63,7 @@ HERE @ TABN CELLS ALLOT CONSTANT SINE
 BUILD-SINE
 ( A phase is 32 bits of a full turn; its top 10 bits index the table. )
 : SIN ( phase -- s ) 22 RSHIFT 1023 AND CELLS SINE + @ ;
+INLINE SIN
 
 ( ---- Tuning: a phase increment per MIDI note. A4 = 440 Hz, and each
   semitone is 2^(1/12) = 1137589835 / 2^30 away from its neighbour. ---- )
@@ -214,11 +243,13 @@ CHAR o CONSTANT 'o'
 : DECAY ( var k -- ) OVER @ * 65536 / SWAP ! ;
 ( One-pole lowpass: y += (x - y) * c / 256. )
 : SMOOTH ( x var c -- y ) >R DUP @ ROT SWAP - R> * 256 / OVER +! @ ;
+INLINE PCT  INLINE SCALE  INLINE DECAY  INLINE SMOOTH
 
 ( ---- Mixing. Pan runs 0 (left) to 256 (right). ---- )
 VARIABLE LEFT  VARIABLE RIGHT
 : MIX ( s pan -- ) 2DUP * 256 / RIGHT +!  256 SWAP - * 256 / LEFT +! ;
 : CLIP ( n -- n ) -32767 MAX 32767 MIN ;
+INLINE MIX  INLINE CLIP
 
 ( ---- Ping-pong echo: the left line feeds the right, the right feeds back
   into the left. Set DELAY (up to two seconds) and FEEDBACK (of 256). ---- )

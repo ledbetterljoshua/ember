@@ -1,0 +1,18 @@
+1 2 + .
+3  ok
+NOPE
+NOPE ?
+1 NOPE 2
+NOPE ?
+5 .
+5  ok
+: X 1 FOO
+FOO ?
+6 .
+6  ok
+: Y 2
+3 ;
+ ok
+Y . .
+3 2  ok
+^D

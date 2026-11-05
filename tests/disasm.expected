@@ -37,19 +37,6 @@ CODE /MOD
   14  str     x2, [x20, #-0x8]!
   18  NEXT
 END-CODE
-CODE (+LOOP)
-   0  ldr     x3, [x20], #0x8
-   4  ldp     x0, x1, [x21]
-   8  add     x0, x0, x3
-   c  str     x0, [x21]
-  10  cmp     x0, x1
-  14  csetm   x2, ge
-  18  csetm   x4, lt
-  1c  cmp     x3, #0x0
-  20  csel    x2, x4, x2, lt
-  24  str     x2, [x20, #-0x8]!
-  28  NEXT
-END-CODE
 CODE IMMEDIATE
    0  adrp    x9, var_LATEST@PAGE
    4  add     x9, x9, var_LATEST@PAGEOFF

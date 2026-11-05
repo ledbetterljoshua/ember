@@ -177,3 +177,29 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
   QUIT and skipped it, which crashed. This one reads the next word in both
   states, and compiles it as a literal so an immediate word can be ticked. )
 : ' IMMEDIATE WORD FIND >CFA STATE @ IF ' LIT , , THEN ;
+( Error recovery. The kernel's INTERPRET prints "name ?" and carries on: a
+  half-built definition stays hidden and keeps compiling the following lines,
+  and an underflowed stack stays underflowed. From here on the outer
+  interpreter is Forth, and an error resets the system to a known state. )
+: RESET ( -- ) S0 @ DSP!
+    STATE @ IF
+        LATEST @ DUP HIDDEN? IF DUP @ LATEST ! HERE ! ELSE DROP THEN
+        0 STATE !
+    THEN ;
+( After an error inside a definition, skip to its ";" rather than run the rest. )
+: SKIP-DEF ( -- ) BEGIN WORD 1 = SWAP C@ ';' = AND UNTIL ;
+: ?STACK ( -- ) DSP@ S0 @ > IF ." stack underflow" CR RESET THEN ;
+( INTERPRET compiles or pushes what it can, and hands back a word to run so
+  that QUIT runs it with nothing of INTERPRET's on the return stack. )
+: INTERPRET ( -- xt true | false )
+    WORD 2DUP FIND ?DUP IF
+        NIP NIP DUP >CFA SWAP 8+ C@ F_IMMED AND STATE @ 0= OR
+        IF TRUE EXIT THEN , FALSE EXIT
+    THEN
+    2DUP NUMBER 0= IF NIP NIP STATE @ IF ' LIT , , THEN FALSE EXIT THEN
+    DROP TELL ."  ?" CR
+    STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF THEN THEN
+    RESET FALSE ;
+: QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK AGAIN ;
+: ABORT ( -- ) RESET QUIT ;
+QUIT

@@ -57,6 +57,10 @@
 : MIN ( a b -- min ) 2DUP > IF SWAP THEN DROP ;
 : MAX ( a b -- max ) 2DUP < IF SWAP THEN DROP ;
 : SPACES ( n -- ) BEGIN DUP 0> WHILE SPACE 1- REPEAT DROP ;
+: ARSHIFT ( n u -- n' ) OVER 0< IF SWAP INVERT SWAP RSHIFT INVERT ELSE RSHIFT THEN ;
+( Errors go to stderr, so a program writing binary to stdout stays intact. )
+: >ERR FLUSH 2 OUT ! ;
+: >OUT FLUSH 1 OUT ! ;
 : DECIMAL 10 BASE ! ;
 : HEX 16 BASE ! ;
 
@@ -112,13 +116,15 @@
 
 ( Defining words. A constant is a tiny colon definition that pushes its value. )
 : CONSTANT ( n -- ) WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
-: VARIABLE HERE @ 1 CELLS ALLOT WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
 
 ( Defining words that define words. <BUILDS makes a word that pushes the
   address of its data; DOES> gives every word built that way a behavior.
     : CONST <BUILDS , DOES> @ ;   7 CONST SEVEN   SEVEN .  \ 7 )
 : <BUILDS ( "name" -- ) WORD CREATE DODOES , 0 , ;
 : DOES> IMMEDIATE ' (DOES>) , ;
+( A variable is a <BUILDS word with one cell of data after its header, so
+  VARIABLE BUF 64 ALLOT gives BUF 72 contiguous bytes. )
+: VARIABLE <BUILDS 0 , ;
 
 ( Introspection: walk the dictionary. )
 : ID. ( header -- ) 8+ DUP 1+ SWAP C@ F_LENMASK AND TELL ;
@@ -161,7 +167,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
 : SEE-DOES ( header -- )
     ." ( " DUP ID. ."  is a <BUILDS word ) " >CFA 8+ @ ?DUP IF ." DOES> " SEE-BODY ELSE CR THEN ;
 : SEE ( "name" -- )
-    WORD FIND ?DUP 0= IF ." not found" CR EXIT THEN
+    WORD FIND ?DUP 0= IF >ERR ." not found" CR >OUT EXIT THEN
     DUP >CFA @ DODOES = IF SEE-DOES EXIT THEN
     DUP >CFA @ DOCOL <> IF SEE-CODE EXIT THEN
     ':' EMIT SPACE DUP ID. SPACE
@@ -175,3 +181,34 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         DUP DICT0 U< IF >R 1+ R> ELSE >R SWAP 1+ SWAP R> THEN @
     REPEAT ;
 : BANNER CENSUS ." ember: " . ." words in arm64, " . ." grown in Forth" CR ;
+
+( The kernel's ' only works compiled: at top level it pushed the next cell of
+  QUIT and skipped it, which crashed. This one reads the next word in both
+  states, and compiles it as a literal so an immediate word can be ticked. )
+: ' IMMEDIATE WORD FIND >CFA STATE @ IF ' LIT , , THEN ;
+( Error recovery. The kernel's INTERPRET prints "name ?" and carries on: a
+  half-built definition stays hidden and keeps compiling the following lines,
+  and an underflowed stack stays underflowed. From here on the outer
+  interpreter is Forth, and an error resets the system to a known state. )
+: RESET ( -- ) S0 @ DSP!
+    STATE @ IF
+        LATEST @ DUP HIDDEN? IF DUP @ LATEST ! HERE ! ELSE DROP THEN
+        0 STATE !
+    THEN ;
+( After an error inside a definition, skip to its ";" rather than run the rest. )
+: SKIP-DEF ( -- ) BEGIN WORD 1 = SWAP C@ ';' = AND UNTIL ;
+: ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT RESET THEN ;
+( INTERPRET compiles or pushes what it can, and hands back a word to run so
+  that QUIT runs it with nothing of INTERPRET's on the return stack. )
+: INTERPRET ( -- xt true | false )
+    WORD 2DUP FIND ?DUP IF
+        NIP NIP DUP >CFA SWAP 8+ C@ F_IMMED AND STATE @ 0= OR
+        IF TRUE EXIT THEN , FALSE EXIT
+    THEN
+    2DUP NUMBER 0= IF NIP NIP STATE @ IF ' LIT , , THEN FALSE EXIT THEN
+    >ERR DROP TELL ."  ?" CR >OUT
+    STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF THEN THEN
+    RESET FALSE ;
+: QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK AGAIN ;
+: ABORT ( -- ) RESET QUIT ;
+QUIT

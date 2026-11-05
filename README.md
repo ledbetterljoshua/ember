@@ -14,6 +14,10 @@ itself in Forth.
   `adrp`/`add` pairs named from the binary's own symbol table, which it reads
   out of the Mach-O image in memory. `lib/disasm-check.sh` diffs it against
   `objdump -d`, instruction by instruction.
+- `lib/see.fs` makes `SEE` rebuild `IF`/`ELSE`/`THEN`, `BEGIN`/`UNTIL`/`AGAIN`,
+  `BEGIN`/`WHILE`/`REPEAT`, `DO`/`LOOP` and `."` from the branch offsets, so
+  `SEE (` prints `: ( IMMEDIATE 1 BEGIN KEY DUP '(' = IF DROP 1+ ELSE ...`.
+  `lib/see-check.sh` recompiles every printout and compares it cell by cell.
 - `demos/`: Mandelbrot in fixed point, Conway's Life on a torus with a Gosper
   gun that its own gliders eventually destroy, `self.fs`, where the system
   decompiles its own decompiler; two songs, `song.fs` (a chiptune) and

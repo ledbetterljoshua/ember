@@ -16,9 +16,13 @@ itself in Forth.
   `objdump -d`, instruction by instruction.
 - `demos/`: Mandelbrot in fixed point, Conway's Life on a torus with a Gosper
   gun that its own gliders eventually destroy, `self.fs`, where the system
-  decompiles its own decompiler; `song.fs`, a synthesizer that reads a
-  tracker score and writes a 53-second stereo WAV to stdout; and `fire.fs`, a
-  fire in 24-bit color that burns for a while and then goes out.
+  decompiles its own decompiler; two songs, `song.fs` (a chiptune) and
+  `lantern.fs` (a music-box waltz), each a tracker score that ember renders to
+  a stereo WAV on stdout; and `fire.fs`, a fire in 24-bit color that burns for
+  a while and then goes out.
+- `lib/tracker.fs`: the studio the songs share: sine table, tuning, score
+  readers, envelopes, mixing, echo and a WAV renderer. Load it before a song:
+  `./ember core.fs lib/tracker.fs demos/lantern.fs > lantern.wav`.
 
 ```
 make            # build
@@ -27,6 +31,7 @@ make demo
 make test
 make song       # renders demos/song.fs to kindling.wav and plays it
 make bench      # CPU cycles per benchmark (bench/run.sh ../other . compares)
+make lantern    # renders demos/lantern.fs to lantern.wav and plays it
 ./ember core.fs demos/life.fs
 ./ember core.fs lib/disasm.fs -    # REPL where SEE DUP reads as assembly
 ```

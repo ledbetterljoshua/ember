@@ -71,22 +71,50 @@ CHAR b CONSTANT FLAT
     DUP C@ SEMITONE
     OVER 1+ C@ DUP SHARP = IF DROP 1+ ELSE FLAT = IF 1- THEN THEN
     SWAP 2 + C@ '0' - 1+ 12 * + ;
+( ---- Score errors. A reader that meets the end of its input, or another
+  reader's opening word, has lost its "]"; a token that isn't a note or a
+  chord is a typo. Either is reported on stderr with the bar it was in, and
+  RENDER then refuses to write a WAV from the broken score. ---- )
+VARIABLE READER  VARIABLE READER#  VARIABLE BAR-COUNT  VARIABLE SCORE-BROKEN
+: READING ( name len -- ) READER# ! READER ! 0 BAR-COUNT ! ;
+: .READER READER @ READER# @ TELL ;
+: SCORE-ERROR ( -- ) ."  (bar " BAR-COUNT @ 1+ U. ." )" CR >OUT
+    -1 SCORE-BROKEN ! ABORT ;
+: TOKEN ( -- addr len )
+    WORD DUP 0= IF 2DROP >ERR .READER ."  is not closed at the end of input"
+        SCORE-ERROR THEN
+    DUP 1 > IF 2DUP + 1- C@ [ CHAR [ ] LITERAL = IF
+        >ERR .READER ."  is not closed before " TELL SCORE-ERROR THEN THEN ;
+: BAD ( addr len what len -- ) >ERR ." bad " TELL SPACE TELL ."  in " .READER SCORE-ERROR ;
+: IN? ( c lo hi -- f ) >R OVER > SWAP R> > OR 0= ;
+: NOTE? ( addr len -- f )
+    DUP 3 = OVER 4 = OR 0= IF 2DROP 0 EXIT THEN
+    4 = IF DUP 3 + C@ [ CHAR 1 ] LITERAL [ CHAR 9 ] LITERAL IN? 0= IF DROP 0 EXIT THEN THEN
+    DUP C@ [ CHAR A ] LITERAL [ CHAR G ] LITERAL IN?
+    OVER 1+ C@ DUP '-' = OVER SHARP = OR SWAP FLAT = OR AND
+    SWAP 2 + C@ [ CHAR 0 ] LITERAL [ CHAR 9 ] LITERAL IN? AND ;
+: STEP? ( addr len -- f )
+    OVER C@ DUP '.' = SWAP CARET = OR IF 2DROP -1 EXIT THEN NOTE? ;
 ( A track holds one byte per step: 0 hold, 1 release, else a MIDI note. )
 : STEP-BYTE ( addr -- byte )
     DUP C@ '.' = IF DROP 0 EXIT THEN
     DUP C@ CARET = IF DROP 1 EXIT THEN
     NOTE ;
 : TRACK[ ( -- addr n )
-    HERE @
-    BEGIN WORD DROP DUP C@ CLOSE <> WHILE
-        DUP C@ BARLINE = IF DROP ELSE STEP-BYTE C, THEN
-    REPEAT DROP HERE @ OVER - ALIGN ;
+    S" TRACK[" READING  HERE @
+    BEGIN TOKEN OVER C@ CLOSE <> WHILE
+        OVER C@ BARLINE = IF 2DROP 1 BAR-COUNT +! ELSE
+            2DUP DUP 3 = IF STEP? ELSE 2DROP 0 THEN
+            IF DROP STEP-BYTE C, ELSE S" note" BAD THEN
+        THEN
+    REPEAT 2DROP HERE @ OVER - ALIGN ;
 ( NOTES[ is TRACK[ with a loudness: two bytes per step, the note byte and a
   velocity 1-9 from an optional fourth character, as in C-58. Default 7. )
 : NOTES[ ( -- addr steps )
-    HERE @
-    BEGIN WORD OVER C@ CLOSE <> WHILE
-        OVER C@ BARLINE = IF 2DROP ELSE
+    S" NOTES[" READING  HERE @
+    BEGIN TOKEN OVER C@ CLOSE <> WHILE
+        OVER C@ BARLINE = IF 2DROP 1 BAR-COUNT +! ELSE
+            2DUP STEP? 0= IF S" note" BAD THEN
             OVER STEP-BYTE C,
             4 = IF 3 + C@ '0' - ELSE DROP 7 THEN C,
         THEN
@@ -131,8 +159,11 @@ VARIABLE C.ROOT  VARIABLE C.BASS
     BEGIN C@+ ?DUP WHILE QUALITY REPEAT
     C.ROOT @  C.MASK @ 4 LSHIFT OR  C.BASS @ 16 LSHIFT OR ;
 : CHORDS[
-    HERE @
-    BEGIN WORD OVER C@ CLOSE <> WHILE CHORD-CELL , REPEAT 2DROP
+    S" CHORDS[" READING  HERE @
+    BEGIN TOKEN OVER C@ CLOSE <> WHILE
+        OVER C@ [ CHAR A ] LITERAL [ CHAR G ] LITERAL IN? 0= IF S" chord" BAD THEN
+        CHORD-CELL ,  1 BAR-COUNT +!
+    REPEAT 2DROP
     DUP CHORDS !  HERE @ SWAP - 8 / CHORD# ! ;
 
 ( The arrangement: one word per bar, each letter switching a part on; the
@@ -149,8 +180,8 @@ VARIABLE SHEET  VARIABLE BARS
         1- 2DUP + C@ LETTER-BIT >R ROT R> OR -ROT
     REPEAT 2DROP ;
 : ARRANGE[
-    HERE @
-    BEGIN WORD OVER C@ CLOSE <> WHILE PARTS , REPEAT 2DROP
+    S" ARRANGE[" READING  HERE @
+    BEGIN TOKEN OVER C@ CLOSE <> WHILE PARTS ,  1 BAR-COUNT +! REPEAT 2DROP
     DUP SHEET !  HERE @ SWAP - 8 / BARS ! ;
 ( PART k is the mask for letter k, folded to a literal when compiled. )
 : PART ( "letter" -- mask ) IMMEDIATE
@@ -217,6 +248,8 @@ VARIABLE SWING
 : STEP-SAMPLES ( -- n ) STEPLEN @ STEP# @ 1 AND IF SWING @ - ELSE SWING @ + THEN ;
 VARIABLE 'TRIGGER  VARIABLE 'FRAME
 : RENDER ( trigger-xt frame-xt -- )
+    SCORE-BROKEN @ IF 2DROP >ERR ." not rendering: the score has errors" CR >OUT EXIT THEN
+    BARS @ 0= IF 2DROP >ERR ." not rendering: no ARRANGE[ ]" CR >OUT EXIT THEN
     'FRAME !  'TRIGGER !
     HEADER
     BARS @ METER @ * 0 DO

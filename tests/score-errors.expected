@@ -1,0 +1,6 @@
+ARRANGE[ is not closed before CHORDS[ (bar 4)
+bad note X-5 in TRACK[ (bar 2)
+bad note Eb5x in NOTES[ (bar 1)
+bad chord Hm in CHORDS[ (bar 2)
+not rendering: the score has errors
+TRACK[ is not closed at the end of input (bar 1)

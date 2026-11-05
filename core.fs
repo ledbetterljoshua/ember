@@ -57,6 +57,10 @@
 : MIN ( a b -- min ) 2DUP > IF SWAP THEN DROP ;
 : MAX ( a b -- max ) 2DUP < IF SWAP THEN DROP ;
 : SPACES ( n -- ) BEGIN DUP 0> WHILE SPACE 1- REPEAT DROP ;
+: ARSHIFT ( n u -- n' ) OVER 0< IF SWAP INVERT SWAP RSHIFT INVERT ELSE RSHIFT THEN ;
+( Errors go to stderr, so a program writing binary to stdout stays intact. )
+: >ERR FLUSH 2 OUT ! ;
+: >OUT FLUSH 1 OUT ! ;
 : DECIMAL 10 BASE ! ;
 : HEX 16 BASE ! ;
 
@@ -158,7 +162,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
 : SEE-DOES ( header -- )
     ." ( " DUP ID. ."  is a <BUILDS word ) " >CFA 8+ @ ?DUP IF ." DOES> " SEE-BODY ELSE CR THEN ;
 : SEE ( "name" -- )
-    WORD FIND ?DUP 0= IF ." not found" CR EXIT THEN
+    WORD FIND ?DUP 0= IF >ERR ." not found" CR >OUT EXIT THEN
     DUP >CFA @ DODOES = IF SEE-DOES EXIT THEN
     DUP >CFA @ DOCOL <> IF SEE-CODE EXIT THEN
     ':' EMIT SPACE DUP ID. SPACE
@@ -188,7 +192,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
     THEN ;
 ( After an error inside a definition, skip to its ";" rather than run the rest. )
 : SKIP-DEF ( -- ) BEGIN WORD 1 = SWAP C@ ';' = AND UNTIL ;
-: ?STACK ( -- ) DSP@ S0 @ > IF ." stack underflow" CR RESET THEN ;
+: ?STACK ( -- ) DSP@ S0 @ > IF >ERR ." stack underflow" CR >OUT RESET THEN ;
 ( INTERPRET compiles or pushes what it can, and hands back a word to run so
   that QUIT runs it with nothing of INTERPRET's on the return stack. )
 : INTERPRET ( -- xt true | false )
@@ -197,7 +201,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         IF TRUE EXIT THEN , FALSE EXIT
     THEN
     2DUP NUMBER 0= IF NIP NIP STATE @ IF ' LIT , , THEN FALSE EXIT THEN
-    DROP TELL ."  ?" CR
+    >ERR DROP TELL ."  ?" CR >OUT
     STATE @ IF LATEST @ HIDDEN? IF SKIP-DEF THEN THEN
     RESET FALSE ;
 : QUIT ( -- ) BEGIN R0 RSP! INTERPRET IF EXECUTE THEN ?STACK AGAIN ;

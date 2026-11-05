@@ -67,11 +67,18 @@
 ( LEAVE makes the current pass the last one. )
 : LEAVE R> R> DROP R@ >R >R ;
 
+( Unsigned division for d below 2^63. /MOD is signed, so halve u first to
+  keep it positive, then correct the remainder, which is less than 2d. )
+: U/MOD ( u d -- rem quot )
+    >R DUP 1 RSHIFT R@ / 1 LSHIFT
+    SWAP OVER R@ * -
+    DUP R@ U< IF R> DROP ELSE R> - SWAP 1+ SWAP THEN SWAP ;
+
 ( Number output, in the current BASE. )
 : U. ( u -- )
-    BASE @ /MOD ?DUP IF RECURSE THEN
+    BASE @ U/MOD ?DUP IF RECURSE THEN
     DUP 10 < IF '0' ELSE 10 - 'A' THEN + EMIT ;
-: UWIDTH ( u -- digits ) 1 SWAP BEGIN BASE @ / ?DUP WHILE SWAP 1+ SWAP REPEAT ;
+: UWIDTH ( u -- digits ) 1 SWAP BEGIN BASE @ U/MOD NIP ?DUP WHILE SWAP 1+ SWAP REPEAT ;
 : U.R ( u width -- ) SWAP DUP UWIDTH ROT SWAP - SPACES U. ;
 : .R ( n width -- )
     SWAP DUP 0< IF NEGATE 1 SWAP ROT 1- ELSE 0 SWAP ROT THEN
@@ -107,6 +114,12 @@
 : CONSTANT ( n -- ) WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
 : VARIABLE HERE @ 1 CELLS ALLOT WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
 
+( Defining words that define words. <BUILDS makes a word that pushes the
+  address of its data; DOES> gives every word built that way a behavior.
+    : CONST <BUILDS , DOES> @ ;   7 CONST SEVEN   SEVEN .  \ 7 )
+: <BUILDS ( "name" -- ) WORD CREATE DODOES , 0 , ;
+: DOES> IMMEDIATE ' (DOES>) , ;
+
 ( Introspection: walk the dictionary. )
 : ID. ( header -- ) 8+ DUP 1+ SWAP C@ F_LENMASK AND TELL ;
 : HIDDEN? ( header -- f ) 8+ C@ F_HIDDEN AND ;
@@ -130,6 +143,7 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         CFA> ID. ."  ( " 8+ DUP @ DUP . ." ) "
         OVER + FAR @ MAX FAR ! 8+ EXIT THEN
     DUP ' ' = IF DROP ." ' " 8+ DUP @ CFA> ID. SPACE 8+ EXIT THEN
+    DUP ' (DOES>) = IF DROP ." DOES> " 8+ EXIT THEN
     CFA> ?DUP IF ID. ELSE ." ?" THEN SPACE 8+ ;
 : SEE-CODE ( header -- )
     ." ( " DUP ID. ." : arm64"
@@ -137,15 +151,19 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
         DUP @ 4294967295 AND DUP SPACE .HEX
         3592355872 = IF LEAVE THEN 4 +
     LOOP DROP ."  )" CR ;
-: SEE ( "name" -- )
-    WORD FIND ?DUP 0= IF ." not found" CR EXIT THEN
-    DUP >CFA @ DOCOL <> IF SEE-CODE EXIT THEN
-    ':' EMIT SPACE DUP ID. SPACE
-    DUP 8+ C@ F_IMMED AND IF ." IMMEDIATE " THEN
-    >CFA 8+
+: SEE-BODY ( addr -- )
     0 FAR !
     BEGIN DUP @ ' EXIT = OVER FAR @ >= AND NOT WHILE SEE-CELL REPEAT
     DROP ';' EMIT CR ;
+: SEE-DOES ( header -- )
+    ." ( " DUP ID. ."  is a <BUILDS word ) " >CFA 8+ @ ?DUP IF ." DOES> " SEE-BODY ELSE CR THEN ;
+: SEE ( "name" -- )
+    WORD FIND ?DUP 0= IF ." not found" CR EXIT THEN
+    DUP >CFA @ DODOES = IF SEE-DOES EXIT THEN
+    DUP >CFA @ DOCOL <> IF SEE-CODE EXIT THEN
+    ':' EMIT SPACE DUP ID. SPACE
+    DUP 8+ C@ F_IMMED AND IF ." IMMEDIATE " THEN
+    >CFA 8+ SEE-BODY ;
 
 ( A census of the dictionary: kernel headers live in the binary, grown ones
   in DICT0 space above it. )
@@ -155,6 +173,10 @@ VARIABLE FAR   ( furthest forward-branch target seen so far )
     REPEAT ;
 : BANNER CENSUS ." ember: " . ." words in arm64, " . ." grown in Forth" CR ;
 
+( The kernel's ' only works compiled: at top level it pushed the next cell of
+  QUIT and skipped it, which crashed. This one reads the next word in both
+  states, and compiles it as a literal so an immediate word can be ticked. )
+: ' IMMEDIATE WORD FIND >CFA STATE @ IF ' LIT , , THEN ;
 ( Error recovery. The kernel's INTERPRET prints "name ?" and carries on: a
   half-built definition stays hidden and keeps compiling the following lines,
   and an underflowed stack stays underflowed. From here on the outer

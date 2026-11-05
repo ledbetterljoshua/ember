@@ -182,6 +182,17 @@ DOCOL:
         add     x19, x0, #8
         NEXT
 
+// A <BUILDS word: codeword DODOES, then a does-pointer cell, then its data.
+// It pushes its data address, then runs the code after DOES> if there is any.
+DODOES:
+        add     x1, x0, #16
+        PUSH    x1
+        ldr     x2, [x0, #8]
+        cbz     x2, 1f
+        PUSHRSP x19
+        mov     x19, x2
+1:      NEXT
+
 // ---------------------------------------------------------------- I/O
 
 // _key: -> w0 = next input byte. Sources are argv[1..] in order ("-" is
@@ -384,6 +395,9 @@ _number:
 
 // _find: x0 = addr, x1 = len -> x0 = header, or 0
 _find:
+        mov     x9, #F_LENMASK          // names are significant to 31 chars
+        cmp     x1, x9
+        csel    x1, x1, x9, ls
         LOADADDR x2, var_LATEST
         ldr     x2, [x2]
 1:      cbz     x2, 5f
@@ -691,6 +705,7 @@ _comma:
 
         defaddr "R0", RZ, return_stack, RSTACK_SIZE
         defaddr "DOCOL", __DOCOL, DOCOL
+        defaddr "DODOES", __DODOES, DODOES
         defaddr "DICT0", DICT0, dict_space
         defconst "F_IMMED", __F_IMMED, F_IMMED
         defconst "F_HIDDEN", __F_HIDDEN, F_HIDDEN
@@ -784,7 +799,9 @@ _comma:
         ldr     x5, [x4]
         str     x5, [x3]
         str     x3, [x4]
-        and     x6, x1, #F_LENMASK
+        mov     x6, #F_LENMASK          // keep 31 chars; a masked length
+        cmp     x1, x6                  // would name a different, shorter word
+        csel    x6, x1, x6, ls
         strb    w6, [x3, #8]
         add     x7, x3, #9
         mov     x8, #0
@@ -871,6 +888,14 @@ _comma:
         add     x19, x19, x0
         add     x19, x19, #7
         and     x19, x19, #~7
+        NEXT
+
+        defcode "(DOES>)", PDOES        // point the newest word at the rest of this one
+        LOADADDR x0, var_LATEST
+        ldr     x0, [x0]
+        bl      _tcfa
+        str     x19, [x0, #8]
+        POPRSP  x19
         NEXT
 
         defcode "EXECUTE", EXECUTE

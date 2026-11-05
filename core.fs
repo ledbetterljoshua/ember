@@ -66,8 +66,8 @@
 
 ( Counted loops: limit start DO ... LOOP. The index lives on the return stack. )
 : DO IMMEDIATE ' SWAP , ' >R , ' >R , HERE @ ;
-: LOOP IMMEDIATE ' (LOOP) , ' 0BRANCH , HERE @ - , ' UNLOOP , ;
-: +LOOP IMMEDIATE ' (+LOOP) , ' 0BRANCH , HERE @ - , ' UNLOOP , ;
+: LOOP IMMEDIATE ' (LOOP) , HERE @ - , ' UNLOOP , ;
+: +LOOP IMMEDIATE ' (+LOOP) , HERE @ - , ' UNLOOP , ;
 ( LEAVE makes the current pass the last one. )
 : LEAVE R> R> DROP R@ >R >R ;
 
@@ -139,13 +139,16 @@
   no Forth to recover, so it prints the machine words up to the first NEXT. )
 : .HEX ( u -- ) BASE @ SWAP HEX U. BASE ! ;
 VARIABLE FAR   ( furthest forward-branch target seen so far )
+: BRANCHY? ( xt -- f ) ( is the next cell a branch offset? )
+    DUP ' 0BRANCH = OVER ' BRANCH = OR
+    OVER ' (LOOP) = OR SWAP ' (+LOOP) = OR ;
 : SEE-CELL ( addr -- addr' )
     DUP @
     DUP ' LIT = IF DROP 8+ DUP @ DUP CFA> ?DUP
         IF ." ['] " ID. SPACE DROP ELSE . THEN 8+ EXIT THEN
     DUP ' LITSTRING = IF DROP [ CHAR S ] LITERAL EMIT '"' EMIT SPACE
         8+ DUP @ SWAP 8+ SWAP 2DUP TELL '"' EMIT SPACE + ALIGNED EXIT THEN
-    DUP ' 0BRANCH = OVER ' BRANCH = OR IF
+    DUP BRANCHY? IF
         CFA> ID. ."  ( " 8+ DUP @ DUP . ." ) "
         OVER + FAR @ MAX FAR ! 8+ EXIT THEN
     DUP ' ' = IF DROP ." ' " 8+ DUP @ CFA> ID. SPACE 8+ EXIT THEN

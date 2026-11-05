@@ -116,13 +116,15 @@
 
 ( Defining words. A constant is a tiny colon definition that pushes its value. )
 : CONSTANT ( n -- ) WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
-: VARIABLE HERE @ 1 CELLS ALLOT WORD CREATE DOCOL , ' LIT , , ' EXIT , ;
 
 ( Defining words that define words. <BUILDS makes a word that pushes the
   address of its data; DOES> gives every word built that way a behavior.
     : CONST <BUILDS , DOES> @ ;   7 CONST SEVEN   SEVEN .  \ 7 )
 : <BUILDS ( "name" -- ) WORD CREATE DODOES , 0 , ;
 : DOES> IMMEDIATE ' (DOES>) , ;
+( A variable is a <BUILDS word with one cell of data after its header, so
+  VARIABLE BUF 64 ALLOT gives BUF 72 contiguous bytes. )
+: VARIABLE <BUILDS 0 , ;
 
 ( Introspection: walk the dictionary. )
 : ID. ( header -- ) 8+ DUP 1+ SWAP C@ F_LENMASK AND TELL ;

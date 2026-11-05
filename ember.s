@@ -5,7 +5,8 @@
 // grown from these primitives by core.fs.
 //
 // Registers:  x19 = IP (next cell to execute)
-//             x20 = data stack pointer (full, descending)
+//             x22 = top of the data stack
+//             x20 = data stack pointer to the rest (full, descending)
 //             x21 = return stack pointer (full, descending)
 //             x0  = W, the codeword address, on entry to any word
 // The machine stack (sp) is only used by the assembly subroutines below.
@@ -45,10 +46,12 @@
         .endm
 
         .macro PUSH reg
-        str     \reg, [x20, #-8]!
+        str     x22, [x20, #-8]!
+        mov     x22, \reg
         .endm
         .macro POP reg
-        ldr     \reg, [x20], #8
+        mov     \reg, x22
+        ldr     x22, [x20], #8
         .endm
         .macro PUSHRSP reg
         str     \reg, [x21, #-8]!
@@ -129,29 +132,23 @@ var_\label :
 
         .macro defcmp name, label, cond
         defcode "\name", \label
-        POP     x0
-        ldr     x1, [x20]
-        cmp     x1, x0
-        csetm   x1, \cond
-        str     x1, [x20]
+        ldr     x1, [x20], #8
+        cmp     x1, x22
+        csetm   x22, \cond
         NEXT
         .endm
 
         .macro defcmp0 name, label, cond
         defcode "\name", \label
-        ldr     x0, [x20]
-        cmp     x0, #0
-        csetm   x0, \cond
-        str     x0, [x20]
+        cmp     x22, #0
+        csetm   x22, \cond
         NEXT
         .endm
 
         .macro defbin name, label, op
         defcode "\name", \label
-        POP     x0
-        ldr     x1, [x20]
-        \op     x1, x1, x0
-        str     x1, [x20]
+        ldr     x1, [x20], #8
+        \op     x22, x1, x22
         NEXT
         .endm
 
@@ -170,10 +167,12 @@ _main:
         LOADADDR x9, cur_fd             // no arguments: read stdin
         str     xzr, [x9]
 1:
-        LOADADDR x20, data_stack
+        LOADADDR x20, data_stack        // empty: x22 is junk that spills to S0
         add     x20, x20, #DSTACK_SIZE
-        LOADADDR x9, var_SZ
-        str     x20, [x9]
+        mov     x22, #0
+        sub     x9, x20, #8
+        LOADADDR x10, var_SZ
+        str     x9, [x10]
         LOADADDR x21, return_stack
         add     x21, x21, #RSTACK_SIZE
         LOADADDR x19, cold_start
@@ -484,84 +483,79 @@ _comma:
 // ---------------------------------------------------------------- stack
 
         defcode "DROP", DROP
-        add     x20, x20, #8
+        ldr     x22, [x20], #8
         NEXT
 
         defcode "SWAP", SWAP
-        ldp     x0, x1, [x20]
-        stp     x1, x0, [x20]
+        ldr     x0, [x20]
+        str     x22, [x20]
+        mov     x22, x0
         NEXT
 
         defcode "DUP", DUP
-        ldr     x0, [x20]
-        PUSH    x0
+        str     x22, [x20, #-8]!
         NEXT
 
         defcode "OVER", OVER
-        ldr     x0, [x20, #8]
-        PUSH    x0
+        ldr     x0, [x20]
+        str     x22, [x20, #-8]!
+        mov     x22, x0
         NEXT
 
         defcode "ROT", ROT              // a b c -- b c a
-        ldp     x0, x1, [x20]
-        ldr     x2, [x20, #16]
-        stp     x2, x0, [x20]
-        str     x1, [x20, #16]
+        ldr     x0, [x20]
+        ldr     x1, [x20, #8]
+        stp     x22, x0, [x20]
+        mov     x22, x1
         NEXT
 
         defcode "-ROT", NROT            // a b c -- c a b
-        ldp     x0, x1, [x20]
-        ldr     x2, [x20, #16]
-        stp     x1, x2, [x20]
-        str     x0, [x20, #16]
+        ldr     x0, [x20]
+        ldr     x1, [x20, #8]
+        stp     x1, x22, [x20]
+        mov     x22, x0
         NEXT
 
         defcode "2DROP", TWODROP
+        ldr     x22, [x20, #8]
         add     x20, x20, #16
         NEXT
 
         defcode "2DUP", TWODUP
-        ldp     x0, x1, [x20]
-        stp     x0, x1, [x20, #-16]!
+        ldr     x0, [x20]
+        stp     x0, x22, [x20, #-16]!
         NEXT
 
-        defcode "2SWAP", TWOSWAP
-        ldp     x0, x1, [x20]
-        ldp     x2, x3, [x20, #16]
-        stp     x2, x3, [x20]
-        stp     x0, x1, [x20, #16]
+        defcode "2SWAP", TWOSWAP        // a b c d -- c d a b
+        ldr     x0, [x20]
+        ldr     x1, [x20, #8]
+        ldr     x2, [x20, #16]
+        stp     x2, x22, [x20]
+        str     x0, [x20, #16]
+        mov     x22, x1
         NEXT
 
         defcode "?DUP", QDUP
-        ldr     x0, [x20]
-        cbz     x0, 1f
-        PUSH    x0
+        cbz     x22, 1f
+        str     x22, [x20, #-8]!
 1:      NEXT
 
 // ---------------------------------------------------------------- arithmetic
 
         defcode "1+", INCR
-        ldr     x0, [x20]
-        add     x0, x0, #1
-        str     x0, [x20]
+        add     x22, x22, #1
         NEXT
 
         defcode "1-", DECR
-        ldr     x0, [x20]
-        sub     x0, x0, #1
-        str     x0, [x20]
+        sub     x22, x22, #1
         NEXT
 
         defcode "8+", INCR8
-        ldr     x0, [x20]
-        add     x0, x0, #8
-        str     x0, [x20]
+        add     x22, x22, #8
         NEXT
 
         defcode "8-", DECR8
-        ldr     x0, [x20]
-        sub     x0, x0, #8
-        str     x0, [x20]
+        sub     x22, x22, #8
         NEXT
 
         defbin  "+", ADD, add
@@ -574,30 +568,27 @@ _comma:
         defbin  "RSHIFT", RSHIFT, lsr
 
         defcode "/MOD", DIVMOD          // a b -- rem quot (truncating)
-        POP     x0
-        POP     x1
-        cbz     x0, 2f
-1:      sdiv    x2, x1, x0
-        msub    x3, x2, x0, x1
-        PUSH    x3
-        PUSH    x2
+        cbz     x22, 2f
+1:      ldr     x1, [x20]
+        sdiv    x2, x1, x22
+        msub    x3, x2, x22, x1
+        str     x3, [x20]
+        mov     x22, x2
         NEXT
 2:      LOADADDR x9, var_DIVZERO        // b = 0: run the handler, if set;
         ldr     x0, [x9]                // otherwise sdiv's quiet 0
         cbz     x0, 1b
+        ldr     x22, [x20, #8]          // the handler gets the stack without a b
+        add     x20, x20, #16
         ldr     x1, [x0]
         br      x1
 
         defcode "NEGATE", NEGATE
-        ldr     x0, [x20]
-        neg     x0, x0
-        str     x0, [x20]
+        neg     x22, x22
         NEXT
 
         defcode "INVERT", INVERT
-        ldr     x0, [x20]
-        mvn     x0, x0
-        str     x0, [x20]
+        mvn     x22, x22
         NEXT
 
         defcmp  "=", EQU, eq
@@ -615,41 +606,39 @@ _comma:
 // ---------------------------------------------------------------- memory
 
         defcode "!", STORE
-        POP     x0
-        POP     x1
-        str     x1, [x0]
+        ldr     x1, [x20], #8
+        str     x1, [x22]
+        ldr     x22, [x20], #8
         NEXT
 
         defcode "@", FETCH
-        ldr     x0, [x20]
-        ldr     x0, [x0]
-        str     x0, [x20]
+        ldr     x22, [x22]
         NEXT
 
         defcode "+!", ADDSTORE
-        POP     x0
-        POP     x1
-        ldr     x2, [x0]
+        ldr     x1, [x20], #8
+        ldr     x2, [x22]
         add     x2, x2, x1
-        str     x2, [x0]
+        str     x2, [x22]
+        ldr     x22, [x20], #8
         NEXT
 
         defcode "C!", STOREBYTE
-        POP     x0
-        POP     x1
-        strb    w1, [x0]
+        ldr     x1, [x20], #8
+        strb    w1, [x22]
+        ldr     x22, [x20], #8
         NEXT
 
         defcode "C@", FETCHBYTE
-        ldr     x0, [x20]
-        ldrb    w0, [x0]
-        str     x0, [x20]
+        ldrb    w22, [x22]
         NEXT
 
         defcode "CMOVE", CMOVE          // src dst len --
-        POP     x2
-        POP     x1
-        POP     x0
+        mov     x2, x22
+        ldr     x1, [x20]
+        ldr     x0, [x20, #8]
+        ldr     x22, [x20, #16]
+        add     x20, x20, #24
 1:      cbz     x2, 2f
         ldrb    w3, [x0], #1
         strb    w3, [x1], #1
@@ -658,9 +647,11 @@ _comma:
 2:      NEXT
 
         defcode "FILL", FILL            // addr len byte --
-        POP     x2
-        POP     x1
-        POP     x0
+        mov     x2, x22
+        ldr     x1, [x20]
+        ldr     x0, [x20, #8]
+        ldr     x22, [x20, #16]
+        add     x20, x20, #24
 1:      cbz     x1, 2f
         strb    w2, [x0], #1
         sub     x1, x1, #1
@@ -670,18 +661,18 @@ _comma:
 // ---------------------------------------------------------------- return stack
 
         defcode ">R", TOR
-        POP     x0
-        PUSHRSP x0
+        str     x22, [x21, #-8]!
+        ldr     x22, [x20], #8
         NEXT
 
         defcode "R>", FROMR
-        POPRSP  x0
-        PUSH    x0
+        str     x22, [x20, #-8]!
+        ldr     x22, [x21], #8
         NEXT
 
         defcode "R@", RFETCH
-        ldr     x0, [x21]
-        PUSH    x0
+        str     x22, [x20, #-8]!
+        ldr     x22, [x21]
         NEXT
 
         defcode "RSP@", RSPFETCH
@@ -696,24 +687,27 @@ _comma:
         add     x21, x21, #8
         NEXT
 
+// DSP@ spills the top into memory so the whole stack reads as cells from
+// the address it returns; DSP! reloads the top from the address it is given.
         defcode "DSP@", DSPFETCH
-        mov     x0, x20
-        PUSH    x0
+        str     x22, [x20, #-8]!
+        mov     x22, x20
         NEXT
 
         defcode "DSP!", DSPSTORE
-        ldr     x20, [x20]
+        add     x20, x22, #8
+        ldr     x22, [x22]
         NEXT
 
 // Counted loops keep ( limit index ) on the return stack, index on top.
         defcode "I", I
-        ldr     x0, [x21]
-        PUSH    x0
+        str     x22, [x20, #-8]!
+        ldr     x22, [x21]
         NEXT
 
         defcode "J", J
-        ldr     x0, [x21, #16]
-        PUSH    x0
+        str     x22, [x20, #-8]!
+        ldr     x22, [x21, #16]
         NEXT
 
 // (LOOP) and (+LOOP) are followed by a branch offset cell, like BRANCH: they
@@ -927,8 +921,8 @@ _comma:
         NEXT
 
         defcode "LIT", __LIT
-        ldr     x0, [x19], #8
-        PUSH    x0
+        str     x22, [x20, #-8]!
+        ldr     x22, [x19], #8
         NEXT
 
         defcode "'", TICK               // compiled: push the next cell, skip it
@@ -942,7 +936,8 @@ _comma:
         NEXT
 
         defcode "0BRANCH", ZBRANCH
-        POP     x0
+        mov     x0, x22
+        ldr     x22, [x20], #8
         cbz     x0, code_BRANCH
         add     x19, x19, #8
         NEXT

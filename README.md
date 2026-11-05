@@ -41,8 +41,8 @@ Registers: `x19` IP, `x20` data stack, `x21` return stack. The kernel's own
 compiler (`:` and `;`) is written as threaded code in the assembly file, since
 there is nothing yet to write it in.
 
-`IF` doesn't exist until `core.fs` line 33 defines it, and comments don't exist
-until line 45, so everything above that point uses `\` line comments, which the
+`IF` doesn't exist until `core.fs` line 34 defines it, and comments don't exist
+until line 46, so everything above that point uses `\` line comments, which the
 assembly tokenizer handles.
 
 Architecture after Richard W.M. Jones's jonesforth (i386, 2009), written fresh

@@ -10,14 +10,16 @@ itself in Forth.
   `SEE`, a decompiler that rebuilds source from compiled threaded code (and
   prints raw ARM64 instruction words for primitives).
 - `demos/`: Mandelbrot in fixed point, Conway's Life on a torus with a Gosper
-  gun that its own gliders eventually destroy, and `self.fs`, where the system
-  decompiles its own decompiler.
+  gun that its own gliders eventually destroy, `self.fs`, where the system
+  decompiles its own decompiler, and `song.fs`, a synthesizer that reads a
+  tracker score and writes a 53-second stereo WAV to stdout.
 
 ```
 make            # build
 make repl       # interactive: type Forth, ctrl-D to quit
 make demo
 make test
+make song       # renders demos/song.fs to kindling.wav and plays it
 ./ember core.fs demos/life.fs
 ```
 

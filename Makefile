@@ -8,7 +8,10 @@ demo: ember
 	./ember core.fs demos/mandel.fs demos/self.fs demos/life.fs
 
 song: ember
-	./ember core.fs demos/song.fs > kindling.wav && afplay kindling.wav
+	./ember core.fs lib/tracker.fs demos/song.fs > kindling.wav && afplay kindling.wav
+
+lantern: ember
+	./ember core.fs lib/tracker.fs demos/lantern.fs > lantern.wav && afplay lantern.wav
 
 test: ember
 	./tests/run.sh
@@ -16,4 +19,4 @@ test: ember
 bench: ember
 	./bench/run.sh
 
-.PHONY: repl demo song test bench
+.PHONY: repl demo song lantern test bench

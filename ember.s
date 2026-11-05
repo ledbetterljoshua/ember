@@ -714,26 +714,39 @@ _comma:
         PUSH    x0
         NEXT
 
-        defcode "(LOOP)", PLOOP         // -- done?
-        ldp     x0, x1, [x21]
+// (LOOP) and (+LOOP) are followed by a branch offset cell, like BRANCH: they
+// jump back by it until the index reaches the limit, then fall through.
+// Index and limit are read with two ldr, not one ldp: an ldp spanning the
+// index stored on the previous pass can't be forwarded from that store and
+// waits for it, which cancelled the gain from branching here.
+        defcode "(LOOP)", PLOOP         // --
+        ldr     x0, [x21]
+        ldr     x1, [x21, #8]
         add     x0, x0, #1
         str     x0, [x21]
         cmp     x0, x1
-        csetm   x2, ge
-        PUSH    x2
+        b.ge    1f
+        ldr     x2, [x19]
+        add     x19, x19, x2
+        NEXT
+1:      add     x19, x19, #8
         NEXT
 
-        defcode "(+LOOP)", PPLOOP       // step -- done?
+        defcode "(+LOOP)", PPLOOP       // step --
         POP     x3
-        ldp     x0, x1, [x21]
+        ldr     x0, [x21]
+        ldr     x1, [x21, #8]
         add     x0, x0, x3
         str     x0, [x21]
         cmp     x0, x1
-        csetm   x2, ge
-        csetm   x4, lt
-        cmp     x3, #0
-        csel    x2, x4, x2, lt
-        PUSH    x2
+        tbnz    x3, #63, 2f             // counting down: done once below limit
+        b.ge    1f
+        b       3f
+2:      b.lt    1f
+3:      ldr     x2, [x19]
+        add     x19, x19, x2
+        NEXT
+1:      add     x19, x19, #8
         NEXT
 
         defcode "UNLOOP", UNLOOP
@@ -899,8 +912,11 @@ _comma:
         defword ":", COLON
         .quad   WORD, CREATE, LIT, DOCOL, COMMA, LATEST, FETCH, HIDDEN, RBRAC, EXIT
 
+// ";" clears the hidden bit rather than toggling it, so a stray ";" can't
+// hide the last finished word.
         defword ";", SEMICOLON, F_IMMED
-        .quad   LIT, EXIT, COMMA, LATEST, FETCH, HIDDEN, LBRAC, EXIT
+        .quad   LIT, EXIT, COMMA, LATEST, FETCH, INCR8, DUP, FETCHBYTE
+        .quad   __F_HIDDEN, INVERT, AND, SWAP, STOREBYTE, LBRAC, EXIT
 
 // ---------------------------------------------------------------- control
 

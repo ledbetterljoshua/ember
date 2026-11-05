@@ -7,7 +7,10 @@ repl: ember
 demo: ember
 	./ember core.fs demos/mandel.fs demos/self.fs demos/life.fs
 
+song: ember
+	./ember core.fs demos/song.fs > kindling.wav && afplay kindling.wav
+
 test: ember
 	./tests/run.sh
 
-.PHONY: repl demo test
+.PHONY: repl demo song test

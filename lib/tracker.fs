@@ -107,8 +107,11 @@ CHAR b CONSTANT FLAT
 VARIABLE READER  VARIABLE READER#  VARIABLE BAR-COUNT  VARIABLE SCORE-BROKEN
 : READING ( name len -- ) READER# ! READER ! 0 BAR-COUNT ! ;
 : .READER READER @ READER# @ TELL ;
+( After an error, the rest of the reader's tokens up to its "]" are not
+  Forth, so skip them rather than interpret them. )
+: SKIP-SCORE ( -- ) BEGIN WORD DUP 0= IF 2DROP EXIT THEN 1 = SWAP C@ CLOSE = AND UNTIL ;
 : SCORE-ERROR ( -- ) ."  (bar " BAR-COUNT @ 1+ U. ." )" CR >OUT
-    -1 SCORE-BROKEN ! ABORT ;
+    -1 SCORE-BROKEN ! SKIP-SCORE RESET QUIT ;
 : TOKEN ( -- addr len )
     WORD DUP 0= IF 2DROP >ERR .READER ."  is not closed at the end of input"
         SCORE-ERROR THEN

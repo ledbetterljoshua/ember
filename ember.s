@@ -72,6 +72,8 @@
 
 // Dictionary header: link (8) | flags+len (1) | name | pad to 8 | codeword
 // Numeric labels 8 and 9 belong to this macro; code bodies use 1-7.
+// No label may start with L: Darwin's assembler keeps those out of the
+// symbol table, so LIT is __LIT, as DOCOL's word is __DOCOL.
         .set link, 0
         .macro header name, label, flags=0
         .data
@@ -414,7 +416,7 @@ _find:
         mov     x9, #F_LENMASK          // names are significant to 31 chars
         cmp     x1, x9
         csel    x1, x1, x9, ls
-        LOADADDR x2, var_LATEST
+        LOADADDR x2, var___LATEST
         ldr     x2, [x2]
 1:      cbz     x2, 5f
         ldrb    w3, [x2, #8]
@@ -545,7 +547,7 @@ _comma:
         defbin  "AND", AND, and
         defbin  "OR", OR, orr
         defbin  "XOR", XOR, eor
-        defbin  "LSHIFT", LSHIFT, lsl
+        defbin  "LSHIFT", __LSHIFT, lsl
         defbin  "RSHIFT", RSHIFT, lsr
 
         defcode "/MOD", DIVMOD          // a b -- rem quot (truncating)
@@ -571,9 +573,9 @@ _comma:
 
         defcmp  "=", EQU, eq
         defcmp  "<>", NEQU, ne
-        defcmp  "<", LT, lt
+        defcmp  "<", __LT, lt
         defcmp  ">", GT, gt
-        defcmp  "<=", LE, le
+        defcmp  "<=", __LE, le
         defcmp  ">=", GE, ge
         defcmp  "U<", ULT, lo
         defcmp0 "0=", ZEQU, eq
@@ -728,7 +730,7 @@ _comma:
 
         defvar  "STATE", STATE
         defvar  "HERE", HERE, dict_space
-        defvar  "LATEST", LATEST, name_BYE
+        defvar  "LATEST", __LATEST, name_BYE
         defvar  "S0", SZ
         defvar  "BASE", BASE, 10
         defvar  "OUT", OUT, 1           // fd that EMIT and TELL write to
@@ -825,7 +827,7 @@ _comma:
         POP     x0
         LOADADDR x2, var_HERE
         ldr     x3, [x2]
-        LOADADDR x4, var_LATEST
+        LOADADDR x4, var___LATEST
         ldr     x5, [x4]
         str     x5, [x3]
         str     x3, [x4]
@@ -852,7 +854,7 @@ _comma:
         bl      _comma
         NEXT
 
-        defcode "[", LBRAC, F_IMMED
+        defcode "[", __LBRAC, F_IMMED
         LOADADDR x9, var_STATE
         str     xzr, [x9]
         NEXT
@@ -864,7 +866,7 @@ _comma:
         NEXT
 
         defcode "IMMEDIATE", IMMEDIATE, F_IMMED
-        LOADADDR x9, var_LATEST
+        LOADADDR x9, var___LATEST
         ldr     x9, [x9]
         ldrb    w10, [x9, #8]
         eor     w10, w10, #F_IMMED
@@ -879,13 +881,13 @@ _comma:
         NEXT
 
         defword ":", COLON
-        .quad   WORD, CREATE, LIT, DOCOL, COMMA, LATEST, FETCH, HIDDEN, RBRAC, EXIT
+        .quad   WORD, CREATE, __LIT, DOCOL, COMMA, __LATEST, FETCH, HIDDEN, RBRAC, EXIT
 
 // ";" clears the hidden bit rather than toggling it, so a stray ";" can't
 // hide the last finished word.
         defword ";", SEMICOLON, F_IMMED
-        .quad   LIT, EXIT, COMMA, LATEST, FETCH, INCR8, DUP, FETCHBYTE
-        .quad   __F_HIDDEN, INVERT, AND, SWAP, STOREBYTE, LBRAC, EXIT
+        .quad   __LIT, EXIT, COMMA, __LATEST, FETCH, INCR8, DUP, FETCHBYTE
+        .quad   __F_HIDDEN, INVERT, AND, SWAP, STOREBYTE, __LBRAC, EXIT
 
 // ---------------------------------------------------------------- control
 
@@ -893,7 +895,7 @@ _comma:
         POPRSP  x19
         NEXT
 
-        defcode "LIT", LIT
+        defcode "LIT", __LIT
         ldr     x0, [x19], #8
         PUSH    x0
         NEXT
@@ -914,7 +916,7 @@ _comma:
         add     x19, x19, #8
         NEXT
 
-        defcode "LITSTRING", LITSTRING  // -- addr len
+        defcode "LITSTRING", __LITSTRING // -- addr len
         ldr     x0, [x19], #8
         PUSH    x19
         PUSH    x0
@@ -924,7 +926,7 @@ _comma:
         NEXT
 
         defcode "(DOES>)", PDOES        // point the newest word at the rest of this one
-        LOADADDR x0, var_LATEST
+        LOADADDR x0, var___LATEST
         ldr     x0, [x0]
         bl      _tcfa
         str     x19, [x0, #8]
@@ -961,7 +963,7 @@ _comma:
         LOADADDR x9, var_STATE
         ldr     x9, [x9]
         cbz     x9, 4f
-        LOADADDR x0, LIT                // compiling a literal
+        LOADADDR x0, __LIT              // compiling a literal
         bl      _comma
         mov     x0, x26
         bl      _comma

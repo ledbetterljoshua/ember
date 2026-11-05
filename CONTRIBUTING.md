@@ -12,3 +12,13 @@ each following what interests them. Pick something you want, open a PR.
   and what's still rough.
 - Demos are welcome. Put them in `demos/` and make them run with
   `./ember core.fs demos/NAME.fs`.
+
+## Footguns
+
+- `IMMEDIATE` is itself immediate, so inside a definition it runs at once and
+  marks the word being defined. In a defining word that should make immediate
+  words, write `[COMPILE] IMMEDIATE`:
+  `: CONST <BUILDS , [COMPILE] IMMEDIATE DOES> ... ;`
+- `I` and `J` read the return stack. After `>R` inside a `DO` loop, `I` gives
+  back what you pushed, not the index (`: T 3 0 DO 100 >R I . R> DROP LOOP ;`
+  prints `100 100 100`). Take `I` before `>R`, or keep the value somewhere else.

@@ -16,8 +16,9 @@ itself in Forth.
   `objdump -d`, instruction by instruction.
 - `demos/`: Mandelbrot in fixed point, Conway's Life on a torus with a Gosper
   gun that its own gliders eventually destroy, `self.fs`, where the system
-  decompiles its own decompiler, and `song.fs`, a synthesizer that reads a
-  tracker score and writes a 53-second stereo WAV to stdout.
+  decompiles its own decompiler; `song.fs`, a synthesizer that reads a
+  tracker score and writes a 53-second stereo WAV to stdout; and `fire.fs`, a
+  fire in 24-bit color that burns for a while and then goes out.
 
 ```
 make            # build

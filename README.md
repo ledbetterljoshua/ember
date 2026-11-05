@@ -10,8 +10,9 @@ itself in Forth.
   `SEE`, a decompiler that rebuilds source from compiled threaded code (and
   prints raw ARM64 instruction words for primitives).
 - `demos/`: Mandelbrot in fixed point, Conway's Life on a torus with a Gosper
-  gun that its own gliders eventually destroy, and `self.fs`, where the system
-  decompiles its own decompiler.
+  gun that its own gliders eventually destroy, `self.fs`, where the system
+  decompiles its own decompiler, and `fire.fs`, a fire in 24-bit color that
+  burns for a while and then goes out.
 
 ```
 make            # build

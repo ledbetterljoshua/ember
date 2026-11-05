@@ -13,8 +13,12 @@ SEE ?DUP
 SEE CMOVE
 SEE MS
 DODOES 7 DISASM
-\ The patched SEE still decompiles colon definitions, and shows the patch.
-SEE SEE
+\ SEE still decompiles colon definitions, and calls SEE-ASM for code.
+: SQ DUP * ; SEE SQ
+: HAS? ( xt body -- f )
+    200 BEGIN >R 8+ 2DUP @ = IF 2DROP R> DROP TRUE EXIT THEN R> 1- DUP 0= UNTIL
+    DROP 2DROP FALSE ;
+'' SEE-ASM '' SEE HAS? . CR
 \ Encodings the kernel doesn't use, as objdump -d prints them (pc = 0).
 HEX
 F2A24683 INSN. CR

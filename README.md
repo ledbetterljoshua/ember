@@ -26,6 +26,7 @@ make repl       # interactive: type Forth, ctrl-D to quit
 make demo
 make test
 make song       # renders demos/song.fs to kindling.wav and plays it
+make bench      # CPU cycles per benchmark (bench/run.sh ../other . compares)
 ./ember core.fs demos/life.fs
 ./ember core.fs lib/disasm.fs -    # REPL where SEE DUP reads as assembly
 ```

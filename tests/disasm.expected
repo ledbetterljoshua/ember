@@ -101,7 +101,8 @@ END-CODE
   10  str     x19, [x21, #-0x8]!
   14  mov     x19, x2
   18  NEXT
-: SEE WORD FIND ?DUP 0= 0BRANCH ( 64 ) S" not found" TELL CR EXIT DUP >CFA @ DODOES = 0BRANCH ( 24 ) SEE-DOES EXIT DUP >CFA @ DOCOL <> 0BRANCH ( 24 ) SEE-ASM EXIT ':' EMIT SPACE DUP ID. SPACE DUP 8+ C@ F_IMMED AND 0BRANCH ( 48 ) S" IMMEDIATE " TELL >CFA 8+ SEE-BODY ;
+: SQ DUP * ;
+-1 
 movk    x3, #0x1234, lsl #16
 mov     w5, #-0x2
 ldp     x1, x2, [x3, #0x10]
